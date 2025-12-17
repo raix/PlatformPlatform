@@ -3,6 +3,10 @@
     "developer-cli": {
       "command": "dotnet",
       "args": ["run", "--project", "developer-cli", "mcp"]
+    },
+    "React Aria": {
+      "command": "npx",
+      "args": ["@react-aria/mcp@latest"]
     }
   }
 }
