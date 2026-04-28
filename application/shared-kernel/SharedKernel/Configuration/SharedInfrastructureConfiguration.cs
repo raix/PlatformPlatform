@@ -2,11 +2,8 @@ using Amazon.S3;
 using Azure.Core;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Azure.Identity;
-using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Azure.Security.KeyVault.Secrets;
 using Azure.Storage.Blobs;
-using Microsoft.ApplicationInsights.AspNetCore.Extensions;
-using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -53,7 +50,7 @@ public static class SharedInfrastructureConfiguration
                 .AddOpenTelemetryExporters();
 
             builder.Services
-                .AddApplicationInsightsTelemetry()
+                .AddScoped<OpenTelemetryEnricher>()
                 .ConfigureHttpClientDefaults(http =>
                     {
                         http.AddStandardResilienceHandler(); // Turn on resilience by default
@@ -284,41 +281,7 @@ public static class SharedInfrastructureConfiguration
                     .ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddOtlpExporter());
             }
 
-            builder.Services.AddOpenTelemetry().UseAzureMonitor(options =>
-                {
-                    options.ConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"] ??
-                                               "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://localhost;LiveEndpoint=https://localhost";
-                }
-            );
-
             return builder;
-        }
-    }
-
-    extension(IServiceCollection services)
-    {
-        private IServiceCollection AddApplicationInsightsTelemetry()
-        {
-            var applicationInsightsServiceOptions = new ApplicationInsightsServiceOptions
-            {
-                EnableQuickPulseMetricStream = false,
-                EnableRequestTrackingTelemetryModule = false,
-                EnableDependencyTrackingTelemetryModule = false,
-                RequestCollectionOptions = { TrackExceptions = false }
-            };
-
-            services
-                .AddApplicationInsightsTelemetry(applicationInsightsServiceOptions)
-                .AddApplicationInsightsTelemetryProcessor<EndpointTelemetryFilter>()
-                .AddScoped<OpenTelemetryEnricher>()
-                .AddSingleton<ITelemetryInitializer, ApplicationInsightsTelemetryInitializer>();
-
-            if (!IsRunningInAzure)
-            {
-                services.AddApplicationInsightsTelemetryProcessor<DevelopmentApplicationInsightsLogger>();
-            }
-
-            return services;
         }
     }
 }

@@ -9,9 +9,6 @@ using Account.Integrations.OAuth;
 using Bogus;
 using FluentAssertions;
 using JetBrains.Annotations;
-using Microsoft.ApplicationInsights;
-using Microsoft.ApplicationInsights.Channel;
-using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -42,10 +39,6 @@ public abstract class ExternalAuthenticationTestBase : IDisposable
     {
         Environment.SetEnvironmentVariable(SinglePageAppConfiguration.PublicUrlKey, "https://localhost:9000");
         Environment.SetEnvironmentVariable(SinglePageAppConfiguration.CdnUrlKey, "https://localhost:9000/account");
-        Environment.SetEnvironmentVariable(
-            "APPLICATIONINSIGHTS_CONNECTION_STRING",
-            "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://localhost;LiveEndpoint=https://localhost"
-        );
         Environment.SetEnvironmentVariable("BypassAntiforgeryValidation", "true");
 
         TimeProvider = TimeProvider.System;
@@ -76,9 +69,6 @@ public abstract class ExternalAuthenticationTestBase : IDisposable
 
         var emailClient = Substitute.For<IEmailClient>();
         services.AddScoped<IEmailClient>(_ => emailClient);
-
-        var telemetryChannel = Substitute.For<ITelemetryChannel>();
-        services.AddSingleton(new TelemetryClient(new TelemetryConfiguration { TelemetryChannel = telemetryChannel }));
 
         services.AddScoped<IExecutionContext, HttpExecutionContext>();
 

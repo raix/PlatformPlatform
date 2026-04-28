@@ -3,7 +3,7 @@ using Account.Database;
 using Account.Features.Subscriptions.Domain;
 using Account.Features.Tenants.Domain;
 using Account.Integrations.Stripe;
-using Microsoft.ApplicationInsights;
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel.Telemetry;
 
@@ -22,7 +22,6 @@ public sealed class ProcessPendingStripeEvents(
     StripeClientFactory stripeClientFactory,
     TimeProvider timeProvider,
     ITelemetryEventsCollector events,
-    TelemetryClient telemetryClient,
     ILogger<ProcessPendingStripeEvents> logger
 )
 {
@@ -267,6 +266,8 @@ public sealed class ProcessPendingStripeEvents(
         }
     }
 
+    private static readonly ActivitySource TelemetryActivitySource = new("PlatformPlatform.TelemetryEvents");
+
     private void SendTelemetryEvents(Tenant tenant, Subscription subscription)
     {
         TenantScopedTelemetryContext.Set(tenant.Id, subscription.Plan.ToString());
@@ -275,8 +276,18 @@ public sealed class ProcessPendingStripeEvents(
         while (events.HasEvents)
         {
             var telemetryEvent = events.Dequeue();
-            telemetryClient.TrackEvent(telemetryEvent.GetType().Name, telemetryEvent.Properties);
-            logger.LogInformation("Telemetry: {EventName} {EventProperties}", telemetryEvent.GetType().Name, string.Join(", ", telemetryEvent.Properties.Select(p => $"{p.Key}={p.Value}")));
+            var eventName = telemetryEvent.GetType().Name;
+
+            using var activity = TelemetryActivitySource.StartActivity(eventName, ActivityKind.Internal);
+            if (activity is not null)
+            {
+                foreach (var property in telemetryEvent.Properties)
+                {
+                    activity.SetTag(property.Key, property.Value);
+                }
+            }
+
+            logger.LogInformation("Telemetry: {EventName} {EventProperties}", eventName, string.Join(", ", telemetryEvent.Properties.Select(p => $"{p.Key}={p.Value}")));
         }
     }
 }

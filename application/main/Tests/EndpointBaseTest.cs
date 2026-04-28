@@ -2,9 +2,6 @@ using System.Net.Http.Headers;
 using Bogus;
 using JetBrains.Annotations;
 using Mapster;
-using Microsoft.ApplicationInsights;
-using Microsoft.ApplicationInsights.Channel;
-using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -37,11 +34,6 @@ public abstract class EndpointBaseTest<TContext> : IDisposable where TContext : 
     {
         Environment.SetEnvironmentVariable(SinglePageAppConfiguration.PublicUrlKey, "https://localhost:9000");
         Environment.SetEnvironmentVariable(SinglePageAppConfiguration.CdnUrlKey, "https://localhost:9000/main");
-        Environment.SetEnvironmentVariable(
-            "APPLICATIONINSIGHTS_CONNECTION_STRING",
-            "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://localhost;LiveEndpoint=https://localhost"
-        );
-
         Services = new ServiceCollection();
         TimeProvider = TimeProvider.System;
 
@@ -81,9 +73,6 @@ public abstract class EndpointBaseTest<TContext> : IDisposable where TContext : 
 
         EmailClient = Substitute.For<IEmailClient>();
         Services.AddScoped<IEmailClient>(_ => EmailClient);
-
-        var telemetryChannel = Substitute.For<ITelemetryChannel>();
-        Services.AddSingleton(new TelemetryClient(new TelemetryConfiguration { TelemetryChannel = telemetryChannel }));
 
         Services.AddScoped<IExecutionContext, HttpExecutionContext>();
 
