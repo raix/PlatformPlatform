@@ -49,5 +49,5 @@ Always verify paths, names, and API routes against the actual codebase. Never re
 This is a mono repository with multiple self-contained systems (SCS), each being a small monolith. All SCSs follow the same structure.
 
 - [application](/application): Contains application code, one folder per SCS, plus shared-kernel and shared-webapp.
-- [cloud-infrastructure](/cloud-infrastructure): Bash and Azure Bicep scripts (IaC).
+- [cloud-infrastructure](/cloud-infrastructure): Infrastructure as Code for Scaleway deployment.
 - [developer-cli](/developer-cli): A .NET CLI tool for automating common developer tasks.

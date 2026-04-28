@@ -24,14 +24,14 @@
 
 Kick-start building top-tier B2B & B2C cloud SaaS products with sleek design, fully localized and accessible, vertical slice architecture, automated and fast DevOps, and top-notch security.
 
-Built to demonstrate seamless flow: backend contracts feed a fully-typed React UI, pipelines make fully automated deployments to Azure, and a multi-agent workflow built on Claude Code's native [Agent Teams](https://code.claude.com/docs/en/agent-teams) where PlatformPlatform-expert agents collaborate to deliver complete features following the opinionated architecture. Think of it as a ready-made blueprint, not a pile of parts to assemble.
+Built to demonstrate seamless flow: backend contracts feed a fully-typed React UI, EU-sovereign deployment to Scaleway, and a multi-agent workflow built on Claude Code's native [Agent Teams](https://code.claude.com/docs/en/agent-teams) where PlatformPlatform-expert agents collaborate to deliver complete features following the opinionated architecture. Think of it as a ready-made blueprint, not a pile of parts to assemble.
 
 ## What's inside
 
 * **Backend** - .NET 10 and C# 14 adhering to the principles of vertical slice architecture, DDD, CQRS, and clean code
 * **Frontend** - React 19, TypeScript, TanStack Router & Query, ShadCN 2.0 with Base UI for accessible UI
-* **CI/CD** - GitHub actions for fast passwordless deployments of docker containers and infrastructure (Bicep)
-* **Infrastructure** - Cost efficient and scalable Azure PaaS services like Azure Container Apps, Azure PostgreSQL, etc.
+* **CI/CD** - GitHub actions for fast deployments of docker containers and infrastructure
+* **Infrastructure** - EU-sovereign Scaleway cloud with managed PostgreSQL, S3-compatible Object Storage, Serverless Containers, and Aspire.Hosting.Scaleway package
 * **Developer CLI** - Extendable .NET CLI for DevEx - set up CI/CD is one command and a couple of questions
 * **AI rules** - 30+ rules & workflows for Claude Code - sync to other editors can be enabled via `.gitignore`
 * **Multi-agent development** - Agent Teams workflow where specialized Claude Code agents with deep PlatformPlatform expertise collaborate end-to-end
@@ -48,7 +48,7 @@ TL;DR: Open the [PlatformPlatform](./application/PlatformPlatform.slnx) solution
 
 ### Prerequisites
 
-For development, you need .NET, Docker, and Node. And GitHub and Azure CLI for setting up CI/CD.
+For development, you need .NET, Docker, and Node. GitHub CLI is optional for CI/CD setup.
 
 <details>
 
@@ -66,7 +66,6 @@ For development, you need .NET, Docker, and Node. And GitHub and Azure CLI for s
     winget install Microsoft.DotNet.SDK.10
     winget install Git.Git
     winget install Docker.DockerDesktop
-    winget install Microsoft.AzureCLI
     winget install GitHub.cli
     ```
 
@@ -102,7 +101,7 @@ Open a terminal and run the following commands (if not installed):
    ```bash
    brew install --cask dotnet-sdk
    brew install --cask docker
-   brew install git azure-cli gh
+   brew install git gh
    ```
 
 3. Install Node.js — the version must match [`.node-version`](./application/.node-version). We recommend [fnm](https://github.com/Schniz/fnm) which auto-installs the exact version via the Developer CLI. When using an IDE like Rider, ensure the active fnm version matches [`.node-version`](./application/.node-version).
@@ -197,7 +196,7 @@ Open a terminal and run the following commands (if not installed):
    dotnet dev-certs https --trust
    ```
 
-9. (Optional) Install GitHub CLI and Azure CLI (needed for CI/CD setup)
+9. (Optional) Install GitHub CLI (needed for CI/CD setup)
 
    ```bash
    (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
@@ -206,7 +205,6 @@ Open a terminal and run the following commands (if not installed):
    && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
    sudo apt-get update && sudo apt-get install -y gh
-   curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
    ```
 
 </details>
@@ -234,7 +232,7 @@ Restart your terminal to make the `pp` command available.
 
 ## 3. Run the Aspire AppHost to spin up everything on localhost
 
-Using Aspire, docker images with PostgreSQL, Blob Storage emulator, and development mail server will be downloaded and started. No need to install anything, or learn complicated commands. Simply run this command, and everything just works 🎉
+Using Aspire, docker images with PostgreSQL, SeaweedFS (S3-compatible storage), and Mailpit (development mail server) will be downloaded and started. No need to install anything, or learn complicated commands. Simply run this command, and everything just works 🎉
 
 With the CLI installed:
 
@@ -326,34 +324,11 @@ Each developer needs their own Stripe sandbox. The local database stays in sync 
 
 All values are stored securely in .NET user secrets and persist across restarts.
 
-## 4. Set up CI/CD with passwordless deployments from GitHub to Azure
+## 4. Set up CI/CD for deployment to Scaleway
 
-Run this command to automate Azure Subscription configuration and set up [GitHub Workflows](https://github.com/platformplatform/PlatformPlatform/actions) for deploying [Azure Infrastructure](./cloud-infrastructure) (using Bicep) and compiling [application code](./application) to Docker images deployed to Azure Container Apps:
-
-```bash
-cd developer-cli
-dotnet run deploy # Tip: Add --verbose-logging to show the used CLI commands
-```
-
-You need to be the owner of the GitHub repository and the Azure Subscription, plus have permissions to create Service Principals and Active Directory Groups.
-
-The command will first prompt you to login to Azure and GitHub, and collect information. You will be presented with a complete list of changes before they are applied. It will look something like this:
-
-![Configure Continuous Deployments](https://platformplatformgithub.blob.core.windows.net/$root/ConfigureContinuousDeployments.png)
-
-Except for adding a DNS record, everything is fully automated. After successful setup, the command will provide simple instructions on how to configure branch policies, Sonar Cloud static code analysis, and more.
-
-The infrastructure is configured with auto-scaling and hosting costs in focus. It will cost less than 2 USD per day for a cluster, and it will allow scaling to millions of users 🎉
-
-![Azure Costs](https://platformplatformgithub.blob.core.windows.net/$root/azure-costs-center.png)
+> **Note:** The Scaleway deployment pipeline is under active development. The `Aspire.Hosting.Scaleway` package provides resource definitions and publish targets, but the automated CI/CD setup command is not yet available.
 
 ### (Optional) Configure Google OAuth for staging and production
-
-If you set up Google OAuth locally, use the Developer CLI to store your Google OAuth credentials as GitHub secrets for deployment to Azure Key Vault:
-
-```bash
-pp github-config
-```
 
 Remember to add redirect URIs for each environment in your Google Cloud Console configuration, e.g.:
 - `https://staging.yourproduct.com/api/account/authentication/Google/login/callback`
@@ -373,13 +348,7 @@ On localhost, the Stripe CLI container automatically forwards webhook events. On
 4. Set the **Destination name** to the environment (e.g., `Staging` or `Production`), set the **Endpoint URL** to `https://app.yourproduct.com/api/account/subscriptions/stripe-webhook` (replace with your actual domain), and click **Continue**
 5. On the destination detail page, click **Reveal** under **Signing secret** to get the webhook secret (`whsec_...`)
 
-Use the Developer CLI to store Stripe credentials as GitHub secrets for deployment to Azure Key Vault:
-
-```bash
-pp github-config
-```
-
-Select the **Stripe** group and enter the **Publishable Key**, **API Key** (Secret key), and **Webhook Secret** (the signing secret from the webhook endpoint). The subscription feature is automatically enabled on Azure when all three secrets are present in Key Vault.
+Configure Stripe credentials as environment variables in your Scaleway Serverless Container deployment. The subscription feature is automatically enabled when all three secrets are present (`STRIPE_PUBLISHABLE_KEY`, `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`).
 
 # Multi-Agent Development with Claude Code
 
@@ -387,7 +356,7 @@ PlatformPlatform includes a multi-agent autonomous development workflow powered 
 
 The entire process can take several hours depending on complexity, but at the end you get a fully implemented feature: backend logic, database migrations, API endpoints, frontend UI, localization, and end-to-end tests. All committed. All tests passing. Ready to ship.
 
-The agents work like a real engineering team, inside the tools you already use. Features and tasks live in your existing product management system (Linear, Azure DevOps, Jira, or markdown files on disk), not in a bespoke AI-only tracker. Write the feature and tasks yourself, or have the team lead interview you and create them for you. From there, the team lead delegates to engineers, who move tasks from planned to active when they start. Reviewers move them to review. The Guardian moves them to completed on a successful commit. You watch progress, comment on tasks, reprioritize, add bugs mid-flight, or restart tasks the agents got wrong, exactly the same way you would with a human team. The full audit trail lives in your product management tool alongside all your other work.
+The agents work like a real engineering team, inside the tools you already use. Features and tasks live in your existing product management system (Linear, Jira, or markdown files on disk), not in a bespoke AI-only tracker. Write the feature and tasks yourself, or have the team lead interview you and create them for you. From there, the team lead delegates to engineers, who move tasks from planned to active when they start. Reviewers move them to review. The Guardian moves them to completed on a successful commit. You watch progress, comment on tasks, reprioritize, add bugs mid-flight, or restart tasks the agents got wrong, exactly the same way you would with a human team. The full audit trail lives in your product management tool alongside all your other work.
 
 <img src="https://platformplatformgithub.blob.core.windows.net/$root/MultiAgentLinearWorkflow.gif" alt="Multi Agent Workflow Linear" title="Multi Agent Workflow Linear" />
 
@@ -446,7 +415,7 @@ git checkout -b feature-name
 
 ### 2. Configure your product management tool (one-time setup)
 
-Pick a tool. The name must match a file in [.claude/reference/product-management/](./.claude/reference/product-management/): `Linear`, `AzureDevOps`, `Jira`, or `Markdown` (for tracking features and tasks as markdown files in your repo).
+Pick a tool. The name must match a file in [.claude/reference/product-management/](./.claude/reference/product-management/): `Linear`, `Jira`, or `Markdown` (for tracking features and tasks as markdown files in your repo).
 
 Set the value in [AGENTS.md](./AGENTS.md):
 
@@ -464,7 +433,7 @@ Start the team lead agent using the [Developer CLI](#2-optional-install-the-deve
 pp claude-agent team-lead
 ```
 
-Use the `/create-prd` skill. The team lead will guide you through a brief interview to understand what you want to build, then generate a complete feature specification with tasks in your configured product management tool (Linear, Azure DevOps, Jira, GitHub, or markdown files).
+Use the `/create-prd` skill. The team lead will guide you through a brief interview to understand what you want to build, then generate a complete feature specification with tasks in your configured product management tool (Linear, Jira, or markdown files).
 
 ### 4. Let the team lead take over
 
@@ -517,10 +486,7 @@ PlatformPlatform is a [monorepo](https://en.wikipedia.org/wiki/Monorepo) contain
 │  │   └─ Tests          # Tests for the Api, Core, and Workers
 │  ├─ shared-kernel      # Reusable components and default configuration for all systems
 │  └─ shared-webapp      # Reusable ShadCN 2.0 components with Base UI that affect all systems
-├─ cloud-infrastructure  # Contains Bash and Bicep scripts (IaC) for Azure resources
-│  ├─ cluster            # Scale units like production-west-eu, production-east-us, etc.
-│  ├─ environment        # Shared resources like App Insights, Container Registry, etc.
-│  └─ modules            # Reusable Bicep modules like Container App, PostgreSQL, etc.
+├─ cloud-infrastructure  # Infrastructure as Code for Scaleway deployment
 └─ developer-cli         # A .NET CLI tool for automating common developer tasks
 ```
 
@@ -572,52 +538,16 @@ The frontend is built with these technologies:
 - [oxlint](https://oxc.rs/docs/guide/usage/linter) and [oxfmt](https://oxc.rs/docs/guide/usage/formatter) for linting and formatting
 - [Node](https://nodejs.org/en)
 
-### Azure Cloud Infrastructure With Enterprise-Grade Security and Zero Secrets
+### EU-Sovereign Cloud Infrastructure on Scaleway
 
-PlatformPlatform's cloud infrastructure is built using the latest Azure Platform as a Service (PaaS) technologies:
+PlatformPlatform deploys to Scaleway, an EU-based cloud provider with full GDPR compliance and no US Cloud Act exposure:
 
-- [Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/overview)
-- [Azure Database for PostgreSQL](https://azure.microsoft.com/en-us/products/postgresql)
-- [Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs)
-- [Azure Service Bus](https://azure.microsoft.com/en-us/services/service-bus)
-- [Azure Key Vault](https://azure.microsoft.com/en-us/services/key-vault)
-- [Azure Application Insights](https://azure.microsoft.com/en-us/services/monitor)
-- [Azure Log Analytics](https://azure.microsoft.com/en-us/services/monitor)
-- [Azure Virtual Network](https://azure.microsoft.com/en-us/services/virtual-network)
-- [Azure Managed Identities](https://docs.microsoft.com/en-us/azure/active-directory/lifecyclesmanaged-identities-azure-resources/overview)
-- [Azure Container Registry](https://azure.microsoft.com/en-us/products/communication-services/)
-- [Azure Communication Services](https://azure.microsoft.com/en-us/products/communication-services/)
-- [Microsoft Defender for Cloud](https://azure.microsoft.com/en-us/products/defender-for-cloud)
+- [Scaleway Serverless Containers](https://www.scaleway.com/en/serverless-containers/) — Auto-scaling container hosting
+- [Scaleway Managed PostgreSQL (RDB)](https://www.scaleway.com/en/database/) — Fully managed PostgreSQL
+- [Scaleway Object Storage](https://www.scaleway.com/en/object-storage/) — S3-compatible blob storage
+- [Scaleway Transactional Email (TEM)](https://www.scaleway.com/en/transactional-email/) — SMTP email delivery
+- [Scaleway Container Registry](https://www.scaleway.com/en/container-registry/) — Docker image registry
+- [Scaleway Secrets Manager](https://www.scaleway.com/en/secret-manager/) — Secrets injected as environment variables
+- [Scaleway Cockpit](https://www.scaleway.com/en/cockpit/) — Grafana-based observability (via OpenTelemetry)
 
-<details>
-
-<summary>Read more about this enterprise-grade architecture</summary>
-
-- **Platform as a Service (PaaS) technologies**: Azure is the leading Cloud Service Provider (CSP) when it comes to PaaS technologies. PlatformPlatform uses PaaS technologies which are fully managed by Microsoft, as opposed to Infrastructure as a Service (IaaS) technologies where the customer is responsible for the underlying infrastructure. This means that Microsoft is responsible for the availability of the infrastructure, and you are only responsible for the application and data. This makes it possible for even a small team to run a highly scalable, stable, and secure solution.
-- **Enterprise-grade security with zero secrets**:
-  - **Managed Identities**: No secrets are used when Container Apps connect to e.g. Databases, Blob Storage, and Service Bus. The infrastructure uses Managed Identities for all communication with Azure resources, eliminating the need for secrets.
-  - **Federated credentials**: Deployment from GitHub to Azure is done using federated credentials, establishing a trust between the GitHub repository and Azure subscription based on the repository's URL, without the need for secrets.
-  - **No secrets expires**: Since no secrets are used, there is no need to rotate secrets, and no risk of secrets expiring.
-  - **100% Security Score**: The current infrastructure configuration follows best practices, and the current setup code achieves a 100% Security Score in Microsoft Defender for Cloud. This minimizes the attack surface and protects against even sophisticated attacks.
-- **Automatic certificate management**: The infrastructure is configured to automatically request and renew SSL certificates, eliminating the need for manual certificate management.
-- **Multiple environments**: The setup includes different environments like Development, Staging, and Production, deployed into clearly named resource groups within a single Azure Subscription.
-- **Multi-region**: Spinning up a cluster in a new region is a matter of adding one extra deployment job to the GitHub workflow. This allows customers to select a region where their data is close to the user and local data protection laws like GDPR, CCPA, etc. are followed.
-- **Azure Container Apps**: The application is hosted using Azure Container Apps, which is a new service from Azure that provides a fully managed Kubernetes environment for running containerized applications. You don't need to be a Kubernetes expert to run your application in a scalable and secure environment.
-- **Scaling from zero to millions of users**: The Azure Container App Environment is configured to scale from zero to millions of users, and the infrastructure is configured to scale automatically based on load. This means the starting costs are very low, and the solution can scale to millions of users without any manual intervention. This enables having Development and Staging environments running with very low costs.
-- **Azure PostgreSQL**: The database is hosted using Azure Database for PostgreSQL Flexible Server, which is a fully managed PostgreSQL database. PostgreSQL is known for its high performance, stability, scalability, and security. The server will easily handle millions of users with single-digit millisecond response times.
-
-</details>
-
-# Screenshots
-
-This is how it looks when GitHub workflows has deployed Azure Infrastructure:
-
-![GitHub Environments](https://platformplatformgithub.blob.core.windows.net/GitHubInfrastructureDeployments.png)
-
-These are the resource groups created when deploying one staging cluster, and two production clusters:
-
-![PlatformPlatform Resource Groups](https://platformplatformgithub.blob.core.windows.net/PlatformPlatformResourceGroups.png)
-
-This is the security score after deploying PlatformPlatform resources to Azure. Achieving a 100% security score in Azure Defender for Cloud without exemptions is not trivial.
-
-![Azure Security Recommendations](https://platformplatformgithub.blob.core.windows.net/AzureSecurityRecommendations.png)
+The `Aspire.Hosting.Scaleway` package in `application/shared-kernel/` provides .NET Aspire hosting support for all Scaleway services, with local dev containers for development and publish targets for cloud deployment.

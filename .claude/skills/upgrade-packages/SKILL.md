@@ -11,7 +11,7 @@ The project always runs the latest version of every package. **Don't quit, give 
 
 ## Permanent Exceptions
 
-- **`Microsoft.ApplicationInsights*` (backend only)** — pass to `--exclude`. The next major deprecates `PageView` tracking as part of moving to OpenTelemetry; the codebase uses it heavily and the migration is a separate effort. Frontend `@microsoft/applicationinsights-*` are not subject to this.
+*No permanent exceptions at this time. Application Insights has been replaced with pure OpenTelemetry.*
 
 ## Principles
 
