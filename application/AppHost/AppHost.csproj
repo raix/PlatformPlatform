@@ -16,6 +16,7 @@
         <ProjectReference Include="..\back-office\Workers\BackOffice.Workers.csproj"/>
         <ProjectReference Include="..\main\Api\Main.Api.csproj"/>
         <ProjectReference Include="..\main\Workers\Main.Workers.csproj"/>
+        <ProjectReference Include="..\shared-kernel\Aspire.Hosting.Scaleway\Aspire.Hosting.Scaleway.csproj" IsAspireProjectResource="false"/>
     </ItemGroup>
 
     <ItemGroup>

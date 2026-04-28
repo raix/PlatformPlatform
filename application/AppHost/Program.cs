@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using AppHost;
+using Aspire.Hosting.Scaleway;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using Projects;
@@ -19,11 +20,12 @@ var (googleOAuthConfigured, googleOAuthClientId, googleOAuthClientSecret) = Conf
 var (stripeConfigured, stripePublishableKey, stripeApiKey, stripeWebhookSecret) = ConfigureStripeParameters();
 var stripeFullyConfigured = stripeConfigured && builder.Configuration["Parameters:stripe-webhook-secret"] is not null and not "not-configured";
 
-var postgresPassword = builder.CreateStablePassword("postgres-password");
-var postgres = builder.AddPostgres("postgres", password: postgresPassword, port: 9002)
-    .WithDataVolume("platform-platform-postgres-data")
-    .WithLifetime(ContainerLifetime.Persistent)
-    .WithArgs("-c", "wal_level=logical");
+var postgres = builder.AddScalewayRdbInstance("postgres")
+    .RunAsPostgresContainer(c => c
+        .WithDataVolume("platform-platform-postgres-data")
+        .WithLifetime(ContainerLifetime.Persistent)
+        .WithArgs("-c", "wal_level=logical")
+    );
 
 var azureStorage = builder
     .AddAzureStorage("azure-storage")
@@ -43,12 +45,8 @@ var azureStorage = builder
     )
     .AddBlobs("blobs");
 
-builder
-    .AddContainer("mail-server", "axllent/mailpit")
-    .WithHttpEndpoint(9003, 8025)
-    .WithEndpoint(9004, 1025)
-    .WithLifetime(ContainerLifetime.Persistent)
-    .WithUrlForEndpoint("http", u => u.DisplayText = "Read mail here");
+builder.AddScalewayTemDomain("mail-server")
+    .RunAsMailpitContainer(httpPort: 9003, smtpPort: 9004);
 
 CreateBlobContainer("avatars");
 CreateBlobContainer("logos");
@@ -57,8 +55,7 @@ var frontendBuild = builder
     .AddJavaScriptApp("frontend-build", "../")
     .WithEnvironment("CERTIFICATE_PASSWORD", certificatePassword);
 
-var accountDatabase = postgres
-    .AddDatabase("account-database", "account");
+var accountDatabase = postgres.AddDatabase("account-database", "account");
 
 var accountWorkers = builder
     .AddProject<Account_Workers>("account-workers")
@@ -81,8 +78,7 @@ var accountApi = builder
     .WithEnvironment("Stripe__AllowMockProvider", "true")
     .WaitFor(accountWorkers);
 
-var backOfficeDatabase = postgres
-    .AddDatabase("back-office-database", "back-office");
+var backOfficeDatabase = postgres.AddDatabase("back-office-database", "back-office");
 
 var backOfficeWorkers = builder
     .AddProject<BackOffice_Workers>("back-office-workers")
@@ -97,8 +93,7 @@ var backOfficeApi = builder
     .WithReference(azureStorage)
     .WaitFor(backOfficeWorkers);
 
-var mainDatabase = postgres
-    .AddDatabase("main-database", "main");
+var mainDatabase = postgres.AddDatabase("main-database", "main");
 
 var mainWorkers = builder
     .AddProject<Main_Workers>("main-workers")

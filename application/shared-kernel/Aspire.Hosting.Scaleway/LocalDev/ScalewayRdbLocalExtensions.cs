@@ -22,8 +22,32 @@ public static class ScalewayRdbLocalExtensions
 
         configureContainer?.Invoke(containerBuilder);
 
+        builder.WithAnnotation(new InnerPostgresAnnotation(containerBuilder));
         builder.WithAnnotation(new ConnectionStringRedirectAnnotation(containerBuilder.Resource));
 
         return builder;
+    }
+
+    /// <summary>
+    /// Adds a named database to the Scaleway RDB instance.
+    /// In local dev (after RunAsPostgresContainer), creates the database on the inner PostgreSQL container.
+    /// </summary>
+    public static IResourceBuilder<PostgresDatabaseResource> AddDatabase(
+        this IResourceBuilder<ScalewayRdbInstanceResource> builder,
+        string name,
+        string? databaseName = null)
+    {
+        var innerAnnotation = builder.Resource.Annotations.OfType<InnerPostgresAnnotation>().FirstOrDefault();
+
+        if (innerAnnotation is not null)
+        {
+            return innerAnnotation.InnerBuilder.AddDatabase(name, databaseName);
+        }
+
+        // Publish mode: create a standalone database resource
+        // The connection string will be resolved by the provisioner
+        return builder.ApplicationBuilder
+            .AddPostgres($"{builder.Resource.Name}-placeholder")
+            .AddDatabase(name, databaseName);
     }
 }

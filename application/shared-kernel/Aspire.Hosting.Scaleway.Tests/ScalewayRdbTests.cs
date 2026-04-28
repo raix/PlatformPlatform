@@ -1,3 +1,4 @@
+using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
@@ -41,16 +42,6 @@ public sealed class ScalewayRdbTests
     }
 
     [Fact]
-    public void AddScalewayRdbDatabase_CreatesResource()
-    {
-        var builder = DistributedApplication.CreateBuilder();
-
-        var database = builder.AddScalewayRdbDatabase("app-db");
-
-        database.Resource.Name.Should().Be("app-db");
-    }
-
-    [Fact]
     public void AddScalewayRdbInstance_ImplementsIScalewayResource()
     {
         var builder = DistributedApplication.CreateBuilder();
@@ -58,5 +49,62 @@ public sealed class ScalewayRdbTests
         var rdb = builder.AddScalewayRdbInstance("my-db");
 
         rdb.Resource.Should().BeAssignableTo<IScalewayResource>();
+    }
+
+    [Fact]
+    public void RunAsPostgresContainer_ThenAddDatabase_CreatesPostgresDatabase()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+
+        var rdb = builder.AddScalewayRdbInstance("postgres")
+            .RunAsPostgresContainer();
+
+        var database = rdb.AddDatabase("account-database", "account");
+
+        database.Resource.Should().BeAssignableTo<IResourceWithConnectionString>();
+        database.Resource.Name.Should().Be("account-database");
+        database.Resource.Should().BeOfType<PostgresDatabaseResource>();
+        ((PostgresDatabaseResource)database.Resource).DatabaseName.Should().Be("account");
+    }
+
+    [Fact]
+    public void RunAsPostgresContainer_ThenAddMultipleDatabases_AllCreated()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+
+        var rdb = builder.AddScalewayRdbInstance("postgres")
+            .RunAsPostgresContainer();
+
+        var accountDb = rdb.AddDatabase("account-database", "account");
+        var backOfficeDb = rdb.AddDatabase("back-office-database", "back_office");
+        var mainDb = rdb.AddDatabase("main-database", "main");
+
+        accountDb.Resource.Name.Should().Be("account-database");
+        backOfficeDb.Resource.Name.Should().Be("back-office-database");
+        mainDb.Resource.Name.Should().Be("main-database");
+
+        // All should share the same parent PostgreSQL server
+        var accountParent = ((PostgresDatabaseResource)accountDb.Resource).Parent;
+        var backOfficeParent = ((PostgresDatabaseResource)backOfficeDb.Resource).Parent;
+        var mainParent = ((PostgresDatabaseResource)mainDb.Resource).Parent;
+
+        accountParent.Should().BeSameAs(backOfficeParent);
+        backOfficeParent.Should().BeSameAs(mainParent);
+    }
+
+    [Fact]
+    public void RunAsPostgresContainer_ConfiguresInnerContainer()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var configured = false;
+
+        builder.AddScalewayRdbInstance("postgres")
+            .RunAsPostgresContainer(c =>
+            {
+                configured = true;
+                c.WithLifetime(ContainerLifetime.Persistent);
+            });
+
+        configured.Should().BeTrue();
     }
 }
