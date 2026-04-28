@@ -22,6 +22,7 @@
     </Folder>
     <Folder Name="/shared-kernel/">
         <Project Path="shared-kernel\Aspire.Hosting.Scaleway\Aspire.Hosting.Scaleway.csproj"/>
+        <Project Path="shared-kernel\Aspire.Hosting.Scaleway.Tests\Aspire.Hosting.Scaleway.Tests.csproj"/>
         <Project Path="shared-kernel\SharedKernel\SharedKernel.csproj"/>
         <Project Path="shared-kernel\Tests\SharedKernel.Tests.csproj"/>
         <Project Path="shared-webapp\SharedKernel.WebApp.esproj"/>
