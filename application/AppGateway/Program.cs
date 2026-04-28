@@ -2,7 +2,6 @@ using AppGateway.ApiAggregation;
 using AppGateway.Filters;
 using AppGateway.Middleware;
 using AppGateway.Transformations;
-using Azure.Core;
 using Scalar.AspNetCore;
 using SharedKernel.Configuration;
 
@@ -15,26 +14,9 @@ var reverseProxyBuilder = builder.Services
     .AddConfigFilter<ApiExplorerRouteFilter>()
     .AddTransforms(context => context.RequestTransforms.Add(context.Services.GetRequiredService<BlockInternalApiTransform>()));
 
-if (SharedInfrastructureConfiguration.IsRunningInAzure)
-{
-    builder.Services.AddSingleton<TokenCredential>(SharedInfrastructureConfiguration.DefaultAzureCredential);
-    builder.Services.AddSingleton<ManagedIdentityTransform>();
-    builder.Services.AddSingleton<ApiVersionHeaderTransform>();
-    builder.Services.AddSingleton<HttpStrictTransportSecurityTransform>();
-    reverseProxyBuilder.AddTransforms(context =>
-        {
-            context.RequestTransforms.Add(context.Services.GetRequiredService<ManagedIdentityTransform>());
-            context.RequestTransforms.Add(context.Services.GetRequiredService<ApiVersionHeaderTransform>());
-            context.ResponseTransforms.Add(context.Services.GetRequiredService<HttpStrictTransportSecurityTransform>());
-        }
-    );
-}
-else
-{
-    builder.Services.AddSingleton<SharedAccessSignatureRequestTransform>();
-    reverseProxyBuilder.AddTransforms(context => context.RequestTransforms.Add(context.Services.GetRequiredService<SharedAccessSignatureRequestTransform>())
-    );
-}
+builder.Services.AddSingleton<SharedAccessSignatureRequestTransform>();
+reverseProxyBuilder.AddTransforms(context => context.RequestTransforms.Add(context.Services.GetRequiredService<SharedAccessSignatureRequestTransform>())
+);
 
 builder.AddNamedBlobStorages([("account-storage", "ACCOUNT_STORAGE_URL")]);
 

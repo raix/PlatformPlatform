@@ -1,15 +1,10 @@
 using Amazon.S3;
-using Azure.Core;
-using Azure.Extensions.AspNetCore.Configuration.Secrets;
-using Azure.Identity;
-using Azure.Security.KeyVault.Secrets;
-using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Npgsql;
 using OpenTelemetry.Instrumentation.AspNetCore;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -21,21 +16,7 @@ namespace SharedKernel.Configuration;
 
 public static class SharedInfrastructureConfiguration
 {
-    public static readonly bool IsRunningInAzure = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID") is not null;
-
     public static readonly bool IsRunningInScaleway = Environment.GetEnvironmentVariable("SCW_SECRET_KEY") is not null;
-
-    public static readonly bool IsRunningInCloud = IsRunningInAzure || IsRunningInScaleway;
-
-    public static DefaultAzureCredential DefaultAzureCredential => GetDefaultAzureCredential();
-
-    private static DefaultAzureCredential GetDefaultAzureCredential()
-    {
-        // Hack: Remove trailing whitespace from the environment variable, added in Bicep to workaround issue #157.
-        var managedIdentityClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID")!.Trim();
-        var credentialOptions = new DefaultAzureCredentialOptions { ManagedIdentityClientId = managedIdentityClientId };
-        return new DefaultAzureCredential(credentialOptions);
-    }
 
     extension(IHostApplicationBuilder builder)
     {
@@ -43,7 +24,6 @@ public static class SharedInfrastructureConfiguration
             where T : DbContext
         {
             builder
-                .AddAzureKeyVaultConfiguration()
                 .ConfigureDatabaseContext<T>(connectionName)
                 .AddDefaultBlobStorage()
                 .AddConfigureOpenTelemetry()
@@ -64,107 +44,51 @@ public static class SharedInfrastructureConfiguration
 
     extension(IHostApplicationBuilder builder)
     {
-        private IHostApplicationBuilder AddAzureKeyVaultConfiguration()
-        {
-            if (IsRunningInAzure)
-            {
-                var keyVaultUri = new Uri(Environment.GetEnvironmentVariable("KEYVAULT_URL")!);
-                var secretClient = new SecretClient(keyVaultUri, DefaultAzureCredential);
-
-                builder.Configuration.AddAzureKeyVault(secretClient, new AzureKeyVaultConfigurationOptions
-                    {
-                        Manager = new KeyVaultSecretManager(),
-                        ReloadInterval = TimeSpan.FromMinutes(1)
-                    }
-                );
-            }
-
-            // Scaleway: secrets are injected as environment variables by the container runtime,
-            // no additional configuration source needed.
-
-            return builder;
-        }
-
         private IHostApplicationBuilder ConfigureDatabaseContext<T>(string connectionName)
             where T : DbContext
         {
-            if (IsRunningInAzure)
-            {
-                var connectionString = Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING");
-                var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-                dataSourceBuilder.UsePeriodicPasswordProvider(async (_, cancellationToken) =>
-                    {
-                        var token = await DefaultAzureCredential.GetTokenAsync(new TokenRequestContext(["https://ossrdbms-aad.database.windows.net/.default"]), cancellationToken);
-                        return token.Token;
-                    }, TimeSpan.FromMinutes(30), TimeSpan.FromSeconds(5)
-                );
-                var dataSource = dataSourceBuilder.Build();
-                builder.Services.AddSingleton(dataSource);
-                builder.Services.AddDbContext<T>(options =>
-                    options.UseNpgsql(dataSource, o => o.MigrationsHistoryTable("__ef_migrations_history")).UseSnakeCaseNamingConvention()
-                );
-            }
-            else
-            {
-                // Scaleway RDB and local dev both use standard connection strings
-                var connectionString = IsRunningInScaleway
-                    ? Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING")
-                    : builder.Configuration.GetConnectionString(connectionName);
+            // Scaleway RDB and local dev both use standard connection strings
+            var connectionString = IsRunningInScaleway
+                ? Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING")
+                : builder.Configuration.GetConnectionString(connectionName);
 
-                builder.Services.AddDbContext<T>(options =>
-                    options.UseNpgsql(connectionString, o => o.MigrationsHistoryTable("__ef_migrations_history")).UseSnakeCaseNamingConvention()
-                );
-            }
+            builder.Services.AddDbContext<T>(options =>
+                options.UseNpgsql(connectionString, o => o.MigrationsHistoryTable("__ef_migrations_history")).UseSnakeCaseNamingConvention()
+            );
 
             return builder;
         }
 
         private IHostApplicationBuilder AddDefaultBlobStorage()
         {
-            if (IsRunningInScaleway)
+            var s3Endpoint = Environment.GetEnvironmentVariable("S3_ENDPOINT");
+            if (s3Endpoint is null)
             {
-                var s3Endpoint = Environment.GetEnvironmentVariable("S3_ENDPOINT")
-                    ?? throw new InvalidOperationException("S3_ENDPOINT environment variable is required for Scaleway.");
-                var s3Client = new AmazonS3Client(
+                // Register a no-op client for test/build scenarios where S3 is not available
+                builder.Services.TryAddSingleton<IBlobStorageClient>(sp =>
+                    new S3BlobStorageClient(new AmazonS3Client(new AmazonS3Config { ServiceURL = "http://localhost:8333", ForcePathStyle = true }), "http://localhost:8333", sp.GetRequiredService<TimeProvider>())
+                );
+                return builder;
+            }
+
+            var s3Config = new AmazonS3Config
+            {
+                ServiceURL = s3Endpoint,
+                ForcePathStyle = true,
+                UseHttp = !IsRunningInScaleway && !s3Endpoint.StartsWith("https")
+            };
+
+            var s3Client = IsRunningInScaleway
+                ? new AmazonS3Client(
                     Environment.GetEnvironmentVariable("SCW_ACCESS_KEY"),
                     Environment.GetEnvironmentVariable("SCW_SECRET_KEY"),
-                    new AmazonS3Config { ServiceURL = s3Endpoint, ForcePathStyle = true }
-                );
-                builder.Services.AddSingleton<IBlobStorageClient>(sp =>
-                    new S3BlobStorageClient(s3Client, s3Endpoint, sp.GetRequiredService<TimeProvider>())
-                );
-            }
-            else if (IsRunningInAzure)
-            {
-                var defaultBlobStorageUri = new Uri(Environment.GetEnvironmentVariable("BLOB_STORAGE_URL")!);
-                builder.Services.AddSingleton<IBlobStorageClient>(sp =>
-                    new AzureBlobStorageClient(new BlobServiceClient(defaultBlobStorageUri, DefaultAzureCredential), sp.GetRequiredService<TimeProvider>())
-                );
-            }
-            else
-            {
-                // Local dev: use S3 (SeaweedFS/MinIO) if available, else Azure emulator
-                var s3Endpoint = Environment.GetEnvironmentVariable("S3_ENDPOINT");
-                if (s3Endpoint is not null)
-                {
-                    var s3Client = new AmazonS3Client(new AmazonS3Config
-                    {
-                        ServiceURL = s3Endpoint,
-                        ForcePathStyle = true,
-                        UseHttp = !s3Endpoint.StartsWith("https")
-                    });
-                    builder.Services.AddSingleton<IBlobStorageClient>(sp =>
-                        new S3BlobStorageClient(s3Client, s3Endpoint, sp.GetRequiredService<TimeProvider>())
-                    );
-                }
-                else
-                {
-                    var connectionString = builder.Configuration.GetConnectionString("blob-storage");
-                    builder.Services.AddSingleton<IBlobStorageClient>(sp =>
-                        new AzureBlobStorageClient(new BlobServiceClient(connectionString), sp.GetRequiredService<TimeProvider>())
-                    );
-                }
-            }
+                    s3Config
+                )
+                : new AmazonS3Client(s3Config);
+
+            builder.Services.AddSingleton<IBlobStorageClient>(sp =>
+                new S3BlobStorageClient(s3Client, s3Endpoint, sp.GetRequiredService<TimeProvider>())
+            );
 
             return builder;
         }
@@ -175,44 +99,39 @@ public static class SharedInfrastructureConfiguration
         /// </summary>
         public IHostApplicationBuilder AddNamedBlobStorages((string ConnectionName, string EnvironmentVariable)?[] connections)
         {
-            if (IsRunningInAzure)
+            var s3Endpoint = Environment.GetEnvironmentVariable("S3_ENDPOINT");
+            if (s3Endpoint is null)
             {
+                // Register no-op keyed clients for test/build scenarios
                 foreach (var connection in connections)
                 {
-                    var storageEndpointUri = new Uri(Environment.GetEnvironmentVariable(connection!.Value.EnvironmentVariable)!);
-                    builder.Services.AddKeyedSingleton<IBlobStorageClient>(connection.Value.ConnectionName,
-                        (sp, _) => new AzureBlobStorageClient(new BlobServiceClient(storageEndpointUri, DefaultAzureCredential), sp.GetRequiredService<TimeProvider>())
+                    builder.Services.TryAddKeyedSingleton<IBlobStorageClient>(connection!.Value.ConnectionName,
+                        (sp, _) => new S3BlobStorageClient(new AmazonS3Client(new AmazonS3Config { ServiceURL = "http://localhost:8333", ForcePathStyle = true }), "http://localhost:8333", sp.GetRequiredService<TimeProvider>())
                     );
                 }
+                return builder;
             }
-            else
+
+            var s3Config = new AmazonS3Config
             {
-                var s3Endpoint = Environment.GetEnvironmentVariable("S3_ENDPOINT");
-                if (s3Endpoint is not null)
-                {
-                    var s3Client = new AmazonS3Client(new AmazonS3Config
-                    {
-                        ServiceURL = s3Endpoint,
-                        ForcePathStyle = true,
-                        UseHttp = !s3Endpoint.StartsWith("https")
-                    });
-                    foreach (var connection in connections)
-                    {
-                        builder.Services.AddKeyedSingleton<IBlobStorageClient>(connection!.Value.ConnectionName,
-                            (sp, _) => new S3BlobStorageClient(s3Client, s3Endpoint, sp.GetRequiredService<TimeProvider>())
-                        );
-                    }
-                }
-                else
-                {
-                    var connectionString = builder.Configuration.GetConnectionString("blob-storage");
-                    foreach (var connection in connections)
-                    {
-                        builder.Services.AddKeyedSingleton<IBlobStorageClient>(connection!.Value.ConnectionName,
-                            (sp, _) => new AzureBlobStorageClient(new BlobServiceClient(connectionString), sp.GetRequiredService<TimeProvider>())
-                        );
-                    }
-                }
+                ServiceURL = s3Endpoint,
+                ForcePathStyle = true,
+                UseHttp = !IsRunningInScaleway && !s3Endpoint.StartsWith("https")
+            };
+
+            var s3Client = IsRunningInScaleway
+                ? new AmazonS3Client(
+                    Environment.GetEnvironmentVariable("SCW_ACCESS_KEY"),
+                    Environment.GetEnvironmentVariable("SCW_SECRET_KEY"),
+                    s3Config
+                )
+                : new AmazonS3Client(s3Config);
+
+            foreach (var connection in connections)
+            {
+                builder.Services.AddKeyedSingleton<IBlobStorageClient>(connection!.Value.ConnectionName,
+                    (sp, _) => new S3BlobStorageClient(s3Client, s3Endpoint, sp.GetRequiredService<TimeProvider>())
+                );
             }
 
             return builder;
