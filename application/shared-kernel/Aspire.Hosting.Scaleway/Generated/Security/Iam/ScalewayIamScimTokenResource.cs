@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Iam ScimToken.
+/// Represents a Scaleway IamScimToken.
 /// </summary>
 public sealed class ScalewayIamScimTokenResource(string name)
     : Resource(name), IScalewayResource

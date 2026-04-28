@@ -6,33 +6,33 @@ namespace Aspire.Hosting.Scaleway.Tests;
 public sealed class ScalewayServerlessContainerTests
 {
     [Fact]
-    public void AddScalewayContainerNamespace_CreatesResource()
+    public void AddScalewayServerlessContainerNamespace_CreatesResource()
     {
         var builder = DistributedApplication.CreateBuilder();
 
-        var ns = builder.AddScalewayContainerNamespace("my-namespace");
+        var ns = builder.AddScalewayServerlessContainerNamespace("my-namespace");
 
         ns.Resource.Name.Should().Be("my-namespace");
         ns.Resource.Region.Should().Be(ScalewayRegion.FrPar);
     }
 
     [Fact]
-    public void AddScalewayContainerContainer_CreatesResource()
+    public void AddScalewayServerlessContainer_CreatesResource()
     {
         var builder = DistributedApplication.CreateBuilder();
 
-        var container = builder.AddScalewayContainerContainer("my-api");
+        var container = builder.AddScalewayServerlessContainer("my-api");
 
         container.Resource.Name.Should().Be("my-api");
         container.Resource.Region.Should().Be(ScalewayRegion.FrPar);
     }
 
     [Fact]
-    public void AddScalewayContainerContainer_PropertiesCanBeSet()
+    public void AddScalewayServerlessContainer_PropertiesCanBeSet()
     {
         var builder = DistributedApplication.CreateBuilder();
 
-        var container = builder.AddScalewayContainerContainer("my-api");
+        var container = builder.AddScalewayServerlessContainer("my-api");
         container.Resource.MemoryLimitBytes = 512 * 1024 * 1024;
         container.Resource.MinScale = 1;
         container.Resource.MaxScale = 10;

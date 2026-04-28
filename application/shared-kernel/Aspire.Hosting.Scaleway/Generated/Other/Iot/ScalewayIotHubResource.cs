@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Iot Hub.
+/// Represents a Scaleway IotHub.
 /// </summary>
 public sealed class ScalewayIotHubResource(string name)
     : Resource(name), IScalewayResource

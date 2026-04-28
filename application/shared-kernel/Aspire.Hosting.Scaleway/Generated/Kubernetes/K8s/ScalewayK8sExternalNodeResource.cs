@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway K8s ExternalNode.
+/// Represents a Scaleway K8sExternalNode.
 /// </summary>
 public sealed class ScalewayK8sExternalNodeResource(string name)
     : Resource(name), IScalewayResource

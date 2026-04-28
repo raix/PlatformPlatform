@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway KeyManager Key.
+/// Represents a Scaleway KeyManagerKey.
 /// </summary>
 public sealed class ScalewayKeyManagerKeyResource(string name)
     : Resource(name), IScalewayResource

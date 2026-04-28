@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Flexibleip FlexibleIP.
+/// Represents a Scaleway FlexibleipFlexibleIP.
 /// </summary>
 public sealed class ScalewayFlexibleipFlexibleIPResource(string name)
     : Resource(name), IScalewayResource

@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Mailbox Domain.
+/// Represents a Scaleway MailboxDomain.
 /// </summary>
 public sealed class ScalewayMailboxDomainResource(string name)
     : Resource(name), IScalewayResource

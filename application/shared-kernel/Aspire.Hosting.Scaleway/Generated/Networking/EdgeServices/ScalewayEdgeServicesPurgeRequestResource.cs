@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway EdgeServices PurgeRequest.
+/// Represents a Scaleway EdgeServicesPurgeRequest.
 /// </summary>
 public sealed class ScalewayEdgeServicesPurgeRequestResource(string name)
     : Resource(name), IScalewayResource

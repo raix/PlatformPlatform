@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Redis Cluster.
+/// Represents a Scaleway RedisCluster.
 /// </summary>
 public sealed class ScalewayRedisClusterResource(string name)
     : Resource(name), IScalewayResource

@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Autoscaling InstanceGroup.
+/// Represents a Scaleway AutoscalingInstanceGroup.
 /// </summary>
 public sealed class ScalewayAutoscalingInstanceGroupResource(string name)
     : Resource(name), IScalewayResource

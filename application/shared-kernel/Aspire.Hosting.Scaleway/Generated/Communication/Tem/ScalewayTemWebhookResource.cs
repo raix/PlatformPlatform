@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Tem Webhook.
+/// Represents a Scaleway TemWebhook.
 /// </summary>
 public sealed class ScalewayTemWebhookResource(string name)
     : Resource(name), IScalewayResource

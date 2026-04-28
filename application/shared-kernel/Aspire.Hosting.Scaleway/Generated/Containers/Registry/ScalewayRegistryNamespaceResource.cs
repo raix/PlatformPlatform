@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Registry Namespace.
+/// Represents a Scaleway RegistryNamespace.
 /// </summary>
 public sealed class ScalewayRegistryNamespaceResource(string name)
     : Resource(name), IScalewayResource

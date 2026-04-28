@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Inference Endpoint.
+/// Represents a Scaleway InferenceEndpoint.
 /// </summary>
 public sealed class ScalewayInferenceEndpointResource(string name)
     : Resource(name), IScalewayResource

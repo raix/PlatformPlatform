@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Rdb ReadReplicaEndpoint.
+/// Represents a Scaleway RdbReadReplicaEndpoint.
 /// </summary>
 public sealed class ScalewayRdbReadReplicaEndpointResource(string name)
     : Resource(name), IScalewayResource

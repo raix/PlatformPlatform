@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Qaas Session.
+/// Represents a Scaleway QaasSession.
 /// </summary>
 public sealed class ScalewayQaasSessionResource(string name)
     : Resource(name), IScalewayResource

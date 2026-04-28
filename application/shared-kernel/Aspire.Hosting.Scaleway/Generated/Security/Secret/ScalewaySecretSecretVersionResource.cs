@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Secret SecretVersion.
+/// Represents a Scaleway SecretSecretVersion.
 /// </summary>
 public sealed class ScalewaySecretSecretVersionResource(string name)
     : Resource(name), IScalewayResource

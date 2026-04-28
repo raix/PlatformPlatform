@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Interlink RoutingPolicy.
+/// Represents a Scaleway InterlinkRoutingPolicy.
 /// </summary>
 public sealed class ScalewayInterlinkRoutingPolicyResource(string name)
     : Resource(name), IScalewayResource

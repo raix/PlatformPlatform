@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Tem Email.
+/// Represents a Scaleway TemEmail.
 /// </summary>
 public sealed class ScalewayTemEmailResource(string name)
     : Resource(name), IScalewayResource

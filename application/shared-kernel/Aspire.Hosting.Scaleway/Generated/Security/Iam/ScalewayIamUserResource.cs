@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Iam User.
+/// Represents a Scaleway IamUser.
 /// </summary>
 public sealed class ScalewayIamUserResource(string name)
     : Resource(name), IScalewayResource

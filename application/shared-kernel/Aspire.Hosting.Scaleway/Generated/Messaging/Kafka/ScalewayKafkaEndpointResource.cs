@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Kafka Endpoint.
+/// Represents a Scaleway KafkaEndpoint.
 /// </summary>
 public sealed class ScalewayKafkaEndpointResource(string name)
     : Resource(name), IScalewayResource

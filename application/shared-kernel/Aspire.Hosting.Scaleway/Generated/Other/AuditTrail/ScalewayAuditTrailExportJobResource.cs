@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway AuditTrail ExportJob.
+/// Represents a Scaleway AuditTrailExportJob.
 /// </summary>
 public sealed class ScalewayAuditTrailExportJobResource(string name)
     : Resource(name), IScalewayResource

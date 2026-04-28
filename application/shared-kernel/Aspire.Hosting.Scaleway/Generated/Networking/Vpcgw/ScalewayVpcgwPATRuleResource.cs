@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Vpcgw PATRule.
+/// Represents a Scaleway VpcgwPATRule.
 /// </summary>
 public sealed class ScalewayVpcgwPATRuleResource(string name)
     : Resource(name), IScalewayResource

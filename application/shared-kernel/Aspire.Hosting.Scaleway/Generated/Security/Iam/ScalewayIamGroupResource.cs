@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Iam Group.
+/// Represents a Scaleway IamGroup.
 /// </summary>
 public sealed class ScalewayIamGroupResource(string name)
     : Resource(name), IScalewayResource

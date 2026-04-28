@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Datawarehouse Endpoint.
+/// Represents a Scaleway DatawarehouseEndpoint.
 /// </summary>
 public sealed class ScalewayDatawarehouseEndpointResource(string name)
     : Resource(name), IScalewayResource

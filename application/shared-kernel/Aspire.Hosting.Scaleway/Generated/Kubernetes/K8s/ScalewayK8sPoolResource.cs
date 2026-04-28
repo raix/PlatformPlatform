@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway K8s Pool.
+/// Represents a Scaleway K8sPool.
 /// </summary>
 public sealed class ScalewayK8sPoolResource(string name)
     : Resource(name), IScalewayResource

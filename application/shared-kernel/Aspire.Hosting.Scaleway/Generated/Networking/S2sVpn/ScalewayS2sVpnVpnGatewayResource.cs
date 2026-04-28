@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway S2sVpn VpnGateway.
+/// Represents a Scaleway S2sVpnVpnGateway.
 /// </summary>
 public sealed class ScalewayS2sVpnVpnGatewayResource(string name)
     : Resource(name), IScalewayResource

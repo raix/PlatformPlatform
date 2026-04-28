@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Lb Certificate.
+/// Represents a Scaleway LbCertificate.
 /// </summary>
 public sealed class ScalewayLbCertificateResource(string name)
     : Resource(name), IScalewayResource

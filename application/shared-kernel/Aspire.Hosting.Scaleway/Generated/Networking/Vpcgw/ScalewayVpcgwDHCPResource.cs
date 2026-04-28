@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Vpcgw DHCP.
+/// Represents a Scaleway VpcgwDHCP.
 /// </summary>
 public sealed class ScalewayVpcgwDHCPResource(string name)
     : Resource(name), IScalewayResource

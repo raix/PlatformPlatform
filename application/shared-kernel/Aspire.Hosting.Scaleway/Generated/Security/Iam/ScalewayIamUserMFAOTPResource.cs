@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Iam UserMFAOTP.
+/// Represents a Scaleway IamUserMFAOTP.
 /// </summary>
 public sealed class ScalewayIamUserMFAOTPResource(string name)
     : Resource(name), IScalewayResource

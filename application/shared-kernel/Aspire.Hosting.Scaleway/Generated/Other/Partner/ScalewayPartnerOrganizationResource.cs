@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Partner Organization.
+/// Represents a Scaleway PartnerOrganization.
 /// </summary>
 public sealed class ScalewayPartnerOrganizationResource(string name)
     : Resource(name), IScalewayResource

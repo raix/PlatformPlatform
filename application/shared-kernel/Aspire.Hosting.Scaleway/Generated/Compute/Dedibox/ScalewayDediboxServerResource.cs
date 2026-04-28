@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Dedibox Server.
+/// Represents a Scaleway DediboxServer.
 /// </summary>
 public sealed class ScalewayDediboxServerResource(string name)
     : Resource(name), IScalewayResource

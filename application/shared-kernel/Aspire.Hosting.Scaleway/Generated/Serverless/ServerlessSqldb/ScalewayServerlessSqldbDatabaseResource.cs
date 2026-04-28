@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway ServerlessSqldb Database.
+/// Represents a Scaleway ServerlessSqldbDatabase.
 /// </summary>
 public sealed class ScalewayServerlessSqldbDatabaseResource(string name)
     : Resource(name), IScalewayResource

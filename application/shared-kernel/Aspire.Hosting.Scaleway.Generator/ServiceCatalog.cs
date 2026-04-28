@@ -79,12 +79,27 @@ public static class ServiceCatalog
         "instance", "baremetal", "applesilicon", "block", "flexibleip"
     ];
 
+    /// <summary>
+    /// Override the PascalCase service prefix used in generated type names.
+    /// Prevents collisions like ScalewayContainerContainerResource.
+    /// </summary>
+    private static readonly Dictionary<string, string> ServiceNameOverrides = new()
+    {
+        ["container"] = "ServerlessContainer",
+        ["function"] = "ServerlessFunction",
+        ["file"] = "FileStorage",
+        ["domain"] = "Dns"
+    };
+
     public static bool IsSkipped(string serviceName) => SkippedServices.Contains(serviceName);
 
     public static string GetCategory(string serviceName) =>
         ServiceToCategory.GetValueOrDefault(serviceName, "Other");
 
     public static bool IsZonal(string serviceName) => ZonalServices.Contains(serviceName);
+
+    public static string GetServicePrefix(string serviceName) =>
+        ServiceNameOverrides.GetValueOrDefault(serviceName, CSharpEmitter.ToPascalCase(serviceName));
 
     public static IReadOnlyCollection<string> AllServices => ServiceToCategory.Keys;
 }

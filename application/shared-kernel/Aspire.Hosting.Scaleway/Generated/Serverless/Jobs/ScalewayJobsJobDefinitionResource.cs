@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Jobs JobDefinition.
+/// Represents a Scaleway JobsJobDefinition.
 /// </summary>
 public sealed class ScalewayJobsJobDefinitionResource(string name)
     : Resource(name), IScalewayResource

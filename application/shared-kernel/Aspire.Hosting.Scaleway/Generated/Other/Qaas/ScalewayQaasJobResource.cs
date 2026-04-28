@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Qaas Job.
+/// Represents a Scaleway QaasJob.
 /// </summary>
 public sealed class ScalewayQaasJobResource(string name)
     : Resource(name), IScalewayResource

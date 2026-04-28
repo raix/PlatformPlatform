@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Instance PrivateNIC.
+/// Represents a Scaleway InstancePrivateNIC.
 /// </summary>
 public sealed class ScalewayInstancePrivateNICResource(string name)
     : Resource(name), IScalewayResource

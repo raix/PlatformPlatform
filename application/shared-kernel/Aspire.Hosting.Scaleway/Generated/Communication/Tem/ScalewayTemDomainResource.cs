@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Tem Domain.
+/// Represents a Scaleway TemDomain.
 /// </summary>
 public sealed class ScalewayTemDomainResource(string name)
     : Resource(name), IScalewayResource

@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Baremetal Server.
+/// Represents a Scaleway BaremetalServer.
 /// </summary>
 public sealed class ScalewayBaremetalServerResource(string name)
     : Resource(name), IScalewayResource

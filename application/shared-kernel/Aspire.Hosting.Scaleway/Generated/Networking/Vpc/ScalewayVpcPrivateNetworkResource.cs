@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Vpc PrivateNetwork.
+/// Represents a Scaleway VpcPrivateNetwork.
 /// </summary>
 public sealed class ScalewayVpcPrivateNetworkResource(string name)
     : Resource(name), IScalewayResource

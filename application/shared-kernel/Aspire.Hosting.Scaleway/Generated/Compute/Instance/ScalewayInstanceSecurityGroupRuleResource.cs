@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Instance SecurityGroupRule.
+/// Represents a Scaleway InstanceSecurityGroupRule.
 /// </summary>
 public sealed class ScalewayInstanceSecurityGroupRuleResource(string name)
     : Resource(name), IScalewayResource

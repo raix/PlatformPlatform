@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Instance Ip.
+/// Represents a Scaleway InstanceIp.
 /// </summary>
 public sealed class ScalewayInstanceIpResource(string name)
     : Resource(name), IScalewayResource

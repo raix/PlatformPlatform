@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Iam Policy.
+/// Represents a Scaleway IamPolicy.
 /// </summary>
 public sealed class ScalewayIamPolicyResource(string name)
     : Resource(name), IScalewayResource

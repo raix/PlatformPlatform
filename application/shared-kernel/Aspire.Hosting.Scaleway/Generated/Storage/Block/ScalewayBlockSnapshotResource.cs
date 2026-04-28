@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Block Snapshot.
+/// Represents a Scaleway BlockSnapshot.
 /// </summary>
 public sealed class ScalewayBlockSnapshotResource(string name)
     : Resource(name), IScalewayResource

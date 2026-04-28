@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Lb Acl.
+/// Represents a Scaleway LbAcl.
 /// </summary>
 public sealed class ScalewayLbAclResource(string name)
     : Resource(name), IScalewayResource

@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Vpc Route.
+/// Represents a Scaleway VpcRoute.
 /// </summary>
 public sealed class ScalewayVpcRouteResource(string name)
     : Resource(name), IScalewayResource

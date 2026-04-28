@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Instance PlacementGroup.
+/// Represents a Scaleway InstancePlacementGroup.
 /// </summary>
 public sealed class ScalewayInstancePlacementGroupResource(string name)
     : Resource(name), IScalewayResource

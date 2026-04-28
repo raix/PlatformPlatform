@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Lb Subscriber.
+/// Represents a Scaleway LbSubscriber.
 /// </summary>
 public sealed class ScalewayLbSubscriberResource(string name)
     : Resource(name), IScalewayResource

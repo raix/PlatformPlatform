@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Dedibox FailoverIPs.
+/// Represents a Scaleway DediboxFailoverIPs.
 /// </summary>
 public sealed class ScalewayDediboxFailoverIPsResource(string name)
     : Resource(name), IScalewayResource

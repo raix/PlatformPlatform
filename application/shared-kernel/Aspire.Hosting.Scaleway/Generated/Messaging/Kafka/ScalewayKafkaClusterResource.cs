@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Kafka Cluster.
+/// Represents a Scaleway KafkaCluster.
 /// </summary>
 public sealed class ScalewayKafkaClusterResource(string name)
     : Resource(name), IScalewayResource

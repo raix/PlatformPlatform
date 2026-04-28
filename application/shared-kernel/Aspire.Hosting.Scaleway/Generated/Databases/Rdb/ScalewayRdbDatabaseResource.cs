@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Rdb Database.
+/// Represents a Scaleway RdbDatabase.
 /// </summary>
 public sealed class ScalewayRdbDatabaseResource(string name)
     : Resource(name), IScalewayResource

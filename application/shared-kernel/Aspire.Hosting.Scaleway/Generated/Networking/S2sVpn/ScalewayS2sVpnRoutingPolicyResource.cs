@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway S2sVpn RoutingPolicy.
+/// Represents a Scaleway S2sVpnRoutingPolicy.
 /// </summary>
 public sealed class ScalewayS2sVpnRoutingPolicyResource(string name)
     : Resource(name), IScalewayResource

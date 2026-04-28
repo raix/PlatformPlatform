@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway S2sVpn Connection.
+/// Represents a Scaleway S2sVpnConnection.
 /// </summary>
 public sealed class ScalewayS2sVpnConnectionResource(string name)
     : Resource(name), IScalewayResource

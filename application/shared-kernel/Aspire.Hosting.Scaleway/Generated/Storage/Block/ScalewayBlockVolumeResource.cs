@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Block Volume.
+/// Represents a Scaleway BlockVolume.
 /// </summary>
 public sealed class ScalewayBlockVolumeResource(string name)
     : Resource(name), IScalewayResource

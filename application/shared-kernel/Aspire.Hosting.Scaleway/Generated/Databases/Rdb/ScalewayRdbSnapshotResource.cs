@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Rdb Snapshot.
+/// Represents a Scaleway RdbSnapshot.
 /// </summary>
 public sealed class ScalewayRdbSnapshotResource(string name)
     : Resource(name), IScalewayResource

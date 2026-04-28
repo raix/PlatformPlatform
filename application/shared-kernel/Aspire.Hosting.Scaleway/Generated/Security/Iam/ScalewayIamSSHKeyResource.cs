@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Iam SSHKey.
+/// Represents a Scaleway IamSSHKey.
 /// </summary>
 public sealed class ScalewayIamSSHKeyResource(string name)
     : Resource(name), IScalewayResource

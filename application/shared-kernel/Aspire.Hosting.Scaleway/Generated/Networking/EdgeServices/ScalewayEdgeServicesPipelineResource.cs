@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway EdgeServices Pipeline.
+/// Represents a Scaleway EdgeServicesPipeline.
 /// </summary>
 public sealed class ScalewayEdgeServicesPipelineResource(string name)
     : Resource(name), IScalewayResource

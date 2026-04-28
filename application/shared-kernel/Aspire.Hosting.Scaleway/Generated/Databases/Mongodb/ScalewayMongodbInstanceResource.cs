@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Mongodb Instance.
+/// Represents a Scaleway MongodbInstance.
 /// </summary>
 public sealed class ScalewayMongodbInstanceResource(string name)
     : Resource(name), IScalewayResource

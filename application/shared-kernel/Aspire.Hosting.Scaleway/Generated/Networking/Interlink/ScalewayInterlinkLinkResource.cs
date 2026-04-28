@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Interlink Link.
+/// Represents a Scaleway InterlinkLink.
 /// </summary>
 public sealed class ScalewayInterlinkLinkResource(string name)
     : Resource(name), IScalewayResource

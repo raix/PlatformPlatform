@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Iam JWT.
+/// Represents a Scaleway IamJWT.
 /// </summary>
 public sealed class ScalewayIamJWTResource(string name)
     : Resource(name), IScalewayResource

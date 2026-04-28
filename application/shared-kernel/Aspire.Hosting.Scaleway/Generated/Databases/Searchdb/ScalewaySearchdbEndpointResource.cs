@@ -2,7 +2,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Represents a Scaleway Searchdb Endpoint.
+/// Represents a Scaleway SearchdbEndpoint.
 /// </summary>
 public sealed class ScalewaySearchdbEndpointResource(string name)
     : Resource(name), IScalewayResource
