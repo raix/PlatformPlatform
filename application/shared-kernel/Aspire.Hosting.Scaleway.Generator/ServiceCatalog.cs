@@ -5,8 +5,7 @@ namespace Aspire.Hosting.Scaleway.Generator;
 /// </summary>
 public static class ServiceCatalog
 {
-    // Skip non-real services and services with hand-written resources
-    private static readonly HashSet<string> SkippedServices = ["std", "test", "rdb", "redis", "tem", "registry", "container"];
+    private static readonly HashSet<string> SkippedServices = ["std", "test"];
 
     private static readonly Dictionary<string, string> ServiceToCategory = new()
     {

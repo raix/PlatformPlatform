@@ -6,28 +6,27 @@ namespace Aspire.Hosting.Scaleway.Tests;
 public sealed class ScalewayTemTests
 {
     [Fact]
-    public void AddScalewayTransactionalEmail_CreatesResourceWithDefaults()
+    public void AddScalewayTemDomain_CreatesResource()
     {
         var builder = DistributedApplication.CreateBuilder();
 
-        var tem = builder.AddScalewayTransactionalEmail("my-email", "example.com");
+        var tem = builder.AddScalewayTemDomain("my-email");
 
         tem.Resource.Name.Should().Be("my-email");
-        tem.Resource.DomainName.Should().Be("example.com");
-        tem.Resource.AcceptTos.Should().BeTrue();
-        tem.Resource.SmtpHost.Should().Be("smtp.tem.scw.cloud");
-        tem.Resource.SmtpPort.Should().Be(465);
+        tem.Resource.DomainName.Should().Be(string.Empty);
         tem.Resource.Region.Should().Be(ScalewayRegion.FrPar);
     }
 
     [Fact]
-    public void WithSmtpPort_SetsPort()
+    public void AddScalewayTemDomain_PropertiesCanBeSet()
     {
         var builder = DistributedApplication.CreateBuilder();
 
-        var tem = builder.AddScalewayTransactionalEmail("my-email", "example.com")
-            .WithSmtpPort(587);
+        var tem = builder.AddScalewayTemDomain("my-email");
+        tem.Resource.DomainName = "example.com";
+        tem.Resource.AcceptTos = true;
 
-        tem.Resource.SmtpPort.Should().Be(587);
+        tem.Resource.DomainName.Should().Be("example.com");
+        tem.Resource.AcceptTos.Should().BeTrue();
     }
 }

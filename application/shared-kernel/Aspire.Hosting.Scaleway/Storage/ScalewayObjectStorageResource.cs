@@ -2,7 +2,8 @@ namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
 /// Represents Scaleway Object Storage (S3-compatible).
-/// Provides an S3-compatible endpoint for storing blobs.
+/// This is not part of the Scaleway management API (uses S3 protocol directly),
+/// so it cannot be auto-generated and is hand-written.
 /// </summary>
 public sealed class ScalewayObjectStorageResource(string name)
     : Resource(name), IScalewayResource, IResourceWithConnectionString

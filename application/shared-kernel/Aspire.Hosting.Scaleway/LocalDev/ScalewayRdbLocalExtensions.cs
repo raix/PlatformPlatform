@@ -18,17 +18,9 @@ public static class ScalewayRdbLocalExtensions
         }
 
         var containerBuilder = builder.ApplicationBuilder
-            .AddPostgres(
-                $"{builder.Resource.Name}-container",
-                password: builder.ApplicationBuilder.CreateResourceBuilder(builder.Resource.PasswordParameter)
-            );
+            .AddPostgres($"{builder.Resource.Name}-container");
 
         configureContainer?.Invoke(containerBuilder);
-
-        foreach (var (resourceName, databaseName) in builder.Resource.Databases)
-        {
-            containerBuilder.AddDatabase(resourceName, databaseName);
-        }
 
         builder.WithAnnotation(new ConnectionStringRedirectAnnotation(containerBuilder.Resource));
 
