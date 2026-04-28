@@ -1,3 +1,4 @@
+using Amazon.S3;
 using Azure.Core;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Azure.Identity;
@@ -114,20 +115,36 @@ public static class SharedInfrastructureConfiguration
 
         private IHostApplicationBuilder AddDefaultBlobStorage()
         {
-            // Register the default storage account for BlobStorage
             if (IsRunningInAzure)
             {
                 var defaultBlobStorageUri = new Uri(Environment.GetEnvironmentVariable("BLOB_STORAGE_URL")!);
                 builder.Services.AddSingleton<IBlobStorageClient>(sp =>
-                    new BlobStorageClient(new BlobServiceClient(defaultBlobStorageUri, DefaultAzureCredential), sp.GetRequiredService<TimeProvider>())
+                    new AzureBlobStorageClient(new BlobServiceClient(defaultBlobStorageUri, DefaultAzureCredential), sp.GetRequiredService<TimeProvider>())
                 );
             }
             else
             {
-                var connectionString = builder.Configuration.GetConnectionString("blob-storage");
-                builder.Services.AddSingleton<IBlobStorageClient>(sp =>
-                    new BlobStorageClient(new BlobServiceClient(connectionString), sp.GetRequiredService<TimeProvider>())
-                );
+                var s3Endpoint = Environment.GetEnvironmentVariable("S3_ENDPOINT");
+                if (s3Endpoint is not null)
+                {
+                    var s3Client = new AmazonS3Client(new AmazonS3Config
+                    {
+                        ServiceURL = s3Endpoint,
+                        ForcePathStyle = true,
+                        UseHttp = !s3Endpoint.StartsWith("https")
+                    });
+                    builder.Services.AddSingleton<IBlobStorageClient>(sp =>
+                        new S3BlobStorageClient(s3Client, s3Endpoint, sp.GetRequiredService<TimeProvider>())
+                    );
+                }
+                else
+                {
+                    // Fallback to Azure emulator for backwards compatibility
+                    var connectionString = builder.Configuration.GetConnectionString("blob-storage");
+                    builder.Services.AddSingleton<IBlobStorageClient>(sp =>
+                        new AzureBlobStorageClient(new BlobServiceClient(connectionString), sp.GetRequiredService<TimeProvider>())
+                    );
+                }
             }
 
             return builder;
@@ -145,18 +162,37 @@ public static class SharedInfrastructureConfiguration
                 {
                     var storageEndpointUri = new Uri(Environment.GetEnvironmentVariable(connection!.Value.EnvironmentVariable)!);
                     builder.Services.AddKeyedSingleton<IBlobStorageClient>(connection.Value.ConnectionName,
-                        (sp, _) => new BlobStorageClient(new BlobServiceClient(storageEndpointUri, DefaultAzureCredential), sp.GetRequiredService<TimeProvider>())
+                        (sp, _) => new AzureBlobStorageClient(new BlobServiceClient(storageEndpointUri, DefaultAzureCredential), sp.GetRequiredService<TimeProvider>())
                     );
                 }
             }
             else
             {
-                var connectionString = builder.Configuration.GetConnectionString("blob-storage");
-                foreach (var connection in connections)
+                var s3Endpoint = Environment.GetEnvironmentVariable("S3_ENDPOINT");
+                if (s3Endpoint is not null)
                 {
-                    builder.Services.AddKeyedSingleton<IBlobStorageClient>(connection!.Value.ConnectionName,
-                        (sp, _) => new BlobStorageClient(new BlobServiceClient(connectionString), sp.GetRequiredService<TimeProvider>())
-                    );
+                    var s3Client = new AmazonS3Client(new AmazonS3Config
+                    {
+                        ServiceURL = s3Endpoint,
+                        ForcePathStyle = true,
+                        UseHttp = !s3Endpoint.StartsWith("https")
+                    });
+                    foreach (var connection in connections)
+                    {
+                        builder.Services.AddKeyedSingleton<IBlobStorageClient>(connection!.Value.ConnectionName,
+                            (sp, _) => new S3BlobStorageClient(s3Client, s3Endpoint, sp.GetRequiredService<TimeProvider>())
+                        );
+                    }
+                }
+                else
+                {
+                    var connectionString = builder.Configuration.GetConnectionString("blob-storage");
+                    foreach (var connection in connections)
+                    {
+                        builder.Services.AddKeyedSingleton<IBlobStorageClient>(connection!.Value.ConnectionName,
+                            (sp, _) => new AzureBlobStorageClient(new BlobServiceClient(connectionString), sp.GetRequiredService<TimeProvider>())
+                        );
+                    }
                 }
             }
 

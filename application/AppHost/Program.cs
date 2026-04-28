@@ -2,8 +2,6 @@ using System.Net;
 using System.Net.Sockets;
 using AppHost;
 using Aspire.Hosting.Scaleway;
-using Azure.Storage.Blobs;
-using Microsoft.Extensions.Configuration;
 using Projects;
 
 // Check for port conflicts before starting
@@ -27,29 +25,11 @@ var postgres = builder.AddScalewayRdbInstance("postgres")
         .WithArgs("-c", "wal_level=logical")
     );
 
-var azureStorage = builder
-    .AddAzureStorage("azure-storage")
-    .RunAsEmulator(resourceBuilder =>
-        {
-            resourceBuilder.WithDataVolume("platform-platform-azure-storage-data");
-            resourceBuilder.WithBlobPort(10000);
-            resourceBuilder.WithLifetime(ContainerLifetime.Persistent);
-        }
-    )
-    .WithAnnotation(new ContainerImageAnnotation
-        {
-            Registry = "mcr.microsoft.com",
-            Image = "azure-storage/azurite",
-            Tag = "latest"
-        }
-    )
-    .AddBlobs("blobs");
+var objectStorage = builder.AddScalewayObjectStorage("object-storage")
+    .RunAsSeaweedFsContainer(s3Port: 8333);
 
 builder.AddScalewayTemDomain("mail-server")
     .RunAsMailpitContainer(httpPort: 9003, smtpPort: 9004);
-
-CreateBlobContainer("avatars");
-CreateBlobContainer("logos");
 
 var frontendBuild = builder
     .AddJavaScriptApp("frontend-build", "../")
@@ -60,14 +40,14 @@ var accountDatabase = postgres.AddDatabase("account-database", "account");
 var accountWorkers = builder
     .AddProject<Account_Workers>("account-workers")
     .WithReference(accountDatabase)
-    .WithReference(azureStorage)
+    .WithS3Storage(objectStorage)
     .WaitFor(accountDatabase);
 
 var accountApi = builder
     .AddProject<Account_Api>("account-api")
     .WithUrlConfiguration("/account")
     .WithReference(accountDatabase)
-    .WithReference(azureStorage)
+    .WithS3Storage(objectStorage)
     .WithEnvironment("OAuth__Google__ClientId", googleOAuthClientId)
     .WithEnvironment("OAuth__Google__ClientSecret", googleOAuthClientSecret)
     .WithEnvironment("OAuth__AllowMockProvider", "true")
@@ -83,14 +63,14 @@ var backOfficeDatabase = postgres.AddDatabase("back-office-database", "back-offi
 var backOfficeWorkers = builder
     .AddProject<BackOffice_Workers>("back-office-workers")
     .WithReference(backOfficeDatabase)
-    .WithReference(azureStorage)
+    .WithS3Storage(objectStorage)
     .WaitFor(backOfficeDatabase);
 
 var backOfficeApi = builder
     .AddProject<BackOffice_Api>("back-office-api")
     .WithUrlConfiguration("/back-office")
     .WithReference(backOfficeDatabase)
-    .WithReference(azureStorage)
+    .WithS3Storage(objectStorage)
     .WaitFor(backOfficeWorkers);
 
 var mainDatabase = postgres.AddDatabase("main-database", "main");
@@ -98,14 +78,14 @@ var mainDatabase = postgres.AddDatabase("main-database", "main");
 var mainWorkers = builder
     .AddProject<Main_Workers>("main-workers")
     .WithReference(mainDatabase)
-    .WithReference(azureStorage)
+    .WithS3Storage(objectStorage)
     .WaitFor(mainDatabase);
 
 var mainApi = builder
     .AddProject<Main_Api>("main-api")
     .WithUrlConfiguration("")
     .WithReference(mainDatabase)
-    .WithReference(azureStorage)
+    .WithS3Storage(objectStorage)
     .WithEnvironment("PUBLIC_GOOGLE_OAUTH_ENABLED", googleOAuthConfigured ? "true" : "false")
     .WithEnvironment("PUBLIC_SUBSCRIPTION_ENABLED", stripeFullyConfigured ? "true" : "false")
     .WaitFor(mainWorkers);
@@ -242,19 +222,6 @@ void AddStripeCliContainer()
         builder.CreateResourceBuilder(new ParameterResource("stripe-api-key", _ => "not-configured", true)),
         builder.CreateResourceBuilder(new ParameterResource("stripe-webhook-secret", _ => "not-configured", true))
     );
-}
-
-void CreateBlobContainer(string containerName)
-{
-    var connectionString = builder.Configuration.GetConnectionString("blob-storage");
-
-    new Task(() =>
-        {
-            var blobServiceClient = new BlobServiceClient(connectionString);
-            var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-            containerClient.CreateIfNotExists();
-        }
-    ).Start();
 }
 
 void CheckPortAvailability()

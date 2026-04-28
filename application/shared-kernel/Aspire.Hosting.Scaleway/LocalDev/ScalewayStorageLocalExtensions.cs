@@ -28,6 +28,8 @@ public static class ScalewayStorageLocalExtensions
 
         configureContainer?.Invoke(containerBuilder);
 
+        builder.WithAnnotation(new InnerS3ContainerAnnotation(containerBuilder, "s3"));
+
         return builder;
     }
 
@@ -58,6 +60,26 @@ public static class ScalewayStorageLocalExtensions
 
         configureContainer?.Invoke(containerBuilder);
 
+        builder.WithAnnotation(new InnerS3ContainerAnnotation(containerBuilder, "s3"));
+
         return builder;
+    }
+
+    /// <summary>
+    /// Wires the S3 endpoint from the local storage container to a project as the S3_ENDPOINT environment variable.
+    /// </summary>
+    public static IResourceBuilder<T> WithS3Storage<T>(
+        this IResourceBuilder<T> projectBuilder,
+        IResourceBuilder<ScalewayObjectStorageResource> storageBuilder) where T : IResourceWithEnvironment, IResourceWithWaitSupport
+    {
+        var s3Annotation = storageBuilder.Resource.Annotations.OfType<InnerS3ContainerAnnotation>().FirstOrDefault();
+
+        if (s3Annotation is not null)
+        {
+            projectBuilder.WithEnvironment("S3_ENDPOINT", s3Annotation.InnerBuilder.GetEndpoint(s3Annotation.EndpointName));
+            projectBuilder.WaitFor(s3Annotation.InnerBuilder);
+        }
+
+        return projectBuilder;
     }
 }

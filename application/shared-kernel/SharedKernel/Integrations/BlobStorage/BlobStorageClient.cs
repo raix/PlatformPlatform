@@ -4,7 +4,7 @@ using Azure.Storage.Sas;
 
 namespace SharedKernel.Integrations.BlobStorage;
 
-public class BlobStorageClient(BlobServiceClient blobServiceClient, TimeProvider timeProvider) : IBlobStorageClient
+public sealed class AzureBlobStorageClient(BlobServiceClient blobServiceClient, TimeProvider timeProvider) : IBlobStorageClient
 {
     public async Task UploadAsync(string containerName, string blobName, string contentType, Stream stream, CancellationToken cancellationToken)
     {
@@ -77,9 +77,16 @@ public class BlobStorageClient(BlobServiceClient blobServiceClient, TimeProvider
         }.ToUri();
     }
 
-    public async Task CreateContainerIfNotExistsAsync(string containerName, PublicAccessType publicAccessType, CancellationToken cancellationToken)
+    public async Task CreateContainerIfNotExistsAsync(string containerName, BlobPublicAccessType publicAccessType, CancellationToken cancellationToken)
     {
+        var azureAccessType = publicAccessType switch
+        {
+            BlobPublicAccessType.Container => PublicAccessType.BlobContainer,
+            BlobPublicAccessType.Blob => PublicAccessType.Blob,
+            _ => PublicAccessType.None
+        };
+
         var blobContainerClient = blobServiceClient.GetBlobContainerClient(containerName);
-        await blobContainerClient.CreateIfNotExistsAsync(publicAccessType, cancellationToken: cancellationToken);
+        await blobContainerClient.CreateIfNotExistsAsync(azureAccessType, cancellationToken: cancellationToken);
     }
 }
