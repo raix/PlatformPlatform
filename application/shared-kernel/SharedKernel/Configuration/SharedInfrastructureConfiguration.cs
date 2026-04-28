@@ -26,6 +26,10 @@ public static class SharedInfrastructureConfiguration
 {
     public static readonly bool IsRunningInAzure = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID") is not null;
 
+    public static readonly bool IsRunningInScaleway = Environment.GetEnvironmentVariable("SCW_SECRET_KEY") is not null;
+
+    public static readonly bool IsRunningInCloud = IsRunningInAzure || IsRunningInScaleway;
+
     public static DefaultAzureCredential DefaultAzureCredential => GetDefaultAzureCredential();
 
     private static DefaultAzureCredential GetDefaultAzureCredential()
@@ -78,18 +82,18 @@ public static class SharedInfrastructureConfiguration
                 );
             }
 
+            // Scaleway: secrets are injected as environment variables by the container runtime,
+            // no additional configuration source needed.
+
             return builder;
         }
 
         private IHostApplicationBuilder ConfigureDatabaseContext<T>(string connectionName)
             where T : DbContext
         {
-            var connectionString = IsRunningInAzure
-                ? Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING")
-                : builder.Configuration.GetConnectionString(connectionName);
-
             if (IsRunningInAzure)
             {
+                var connectionString = Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING");
                 var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
                 dataSourceBuilder.UsePeriodicPasswordProvider(async (_, cancellationToken) =>
                     {
@@ -105,6 +109,11 @@ public static class SharedInfrastructureConfiguration
             }
             else
             {
+                // Scaleway RDB and local dev both use standard connection strings
+                var connectionString = IsRunningInScaleway
+                    ? Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING")
+                    : builder.Configuration.GetConnectionString(connectionName);
+
                 builder.Services.AddDbContext<T>(options =>
                     options.UseNpgsql(connectionString, o => o.MigrationsHistoryTable("__ef_migrations_history")).UseSnakeCaseNamingConvention()
                 );
@@ -115,7 +124,20 @@ public static class SharedInfrastructureConfiguration
 
         private IHostApplicationBuilder AddDefaultBlobStorage()
         {
-            if (IsRunningInAzure)
+            if (IsRunningInScaleway)
+            {
+                var s3Endpoint = Environment.GetEnvironmentVariable("S3_ENDPOINT")
+                    ?? throw new InvalidOperationException("S3_ENDPOINT environment variable is required for Scaleway.");
+                var s3Client = new AmazonS3Client(
+                    Environment.GetEnvironmentVariable("SCW_ACCESS_KEY"),
+                    Environment.GetEnvironmentVariable("SCW_SECRET_KEY"),
+                    new AmazonS3Config { ServiceURL = s3Endpoint, ForcePathStyle = true }
+                );
+                builder.Services.AddSingleton<IBlobStorageClient>(sp =>
+                    new S3BlobStorageClient(s3Client, s3Endpoint, sp.GetRequiredService<TimeProvider>())
+                );
+            }
+            else if (IsRunningInAzure)
             {
                 var defaultBlobStorageUri = new Uri(Environment.GetEnvironmentVariable("BLOB_STORAGE_URL")!);
                 builder.Services.AddSingleton<IBlobStorageClient>(sp =>
@@ -124,6 +146,7 @@ public static class SharedInfrastructureConfiguration
             }
             else
             {
+                // Local dev: use S3 (SeaweedFS/MinIO) if available, else Azure emulator
                 var s3Endpoint = Environment.GetEnvironmentVariable("S3_ENDPOINT");
                 if (s3Endpoint is not null)
                 {
@@ -139,7 +162,6 @@ public static class SharedInfrastructureConfiguration
                 }
                 else
                 {
-                    // Fallback to Azure emulator for backwards compatibility
                     var connectionString = builder.Configuration.GetConnectionString("blob-storage");
                     builder.Services.AddSingleton<IBlobStorageClient>(sp =>
                         new AzureBlobStorageClient(new BlobServiceClient(connectionString), sp.GetRequiredService<TimeProvider>())

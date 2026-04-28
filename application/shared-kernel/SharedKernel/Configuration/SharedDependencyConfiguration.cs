@@ -33,6 +33,11 @@ public static class SharedDependencyConfiguration
 
     public static ITokenSigningClient GetTokenSigningService()
     {
+        if (SharedInfrastructureConfiguration.IsRunningInScaleway)
+        {
+            return new EnvironmentTokenSigningClient();
+        }
+
         if (SharedInfrastructureConfiguration.IsRunningInAzure)
         {
             var keyVaultUri = new Uri(Environment.GetEnvironmentVariable("KEYVAULT_URL")!);
@@ -141,7 +146,11 @@ public static class SharedDependencyConfiguration
 
         private IServiceCollection AddEmailClient()
         {
-            if (SharedInfrastructureConfiguration.IsRunningInAzure)
+            if (SharedInfrastructureConfiguration.IsRunningInScaleway)
+            {
+                services.AddTransient<IEmailClient, SmtpEmailClient>();
+            }
+            else if (SharedInfrastructureConfiguration.IsRunningInAzure)
             {
                 var keyVaultUri = new Uri(Environment.GetEnvironmentVariable("KEYVAULT_URL")!);
                 services
