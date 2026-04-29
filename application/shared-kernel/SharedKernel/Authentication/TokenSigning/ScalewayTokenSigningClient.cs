@@ -13,11 +13,12 @@ public sealed class ScalewayTokenSigningClient : ITokenSigningClient
     private readonly byte[] _key;
 
     public ScalewayTokenSigningClient()
+        : this(CreateDefaultHttpClient(), Environment.GetEnvironmentVariable("SCW_DEFAULT_REGION") ?? "fr-par", Environment.GetEnvironmentVariable("SCW_DEFAULT_PROJECT_ID")!)
     {
-        using var httpClient = CreateHttpClient();
-        var region = Environment.GetEnvironmentVariable("SCW_DEFAULT_REGION") ?? "fr-par";
-        var projectId = Environment.GetEnvironmentVariable("SCW_DEFAULT_PROJECT_ID")!;
+    }
 
+    internal ScalewayTokenSigningClient(HttpClient httpClient, string region, string projectId)
+    {
         _key = Convert.FromBase64String(GetSecretByName(httpClient, region, projectId, "authentication-token-signing-key"));
         Issuer = GetSecretByName(httpClient, region, projectId, "authentication-token-issuer");
         Audience = GetSecretByName(httpClient, region, projectId, "authentication-token-audience");
@@ -59,7 +60,7 @@ public sealed class ScalewayTokenSigningClient : ITokenSigningClient
         return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(base64));
     }
 
-    private static HttpClient CreateHttpClient()
+    private static HttpClient CreateDefaultHttpClient()
     {
         var apiUrl = Environment.GetEnvironmentVariable("SCW_API_URL") ?? "https://api.scaleway.com";
         var secretKey = Environment.GetEnvironmentVariable("SCW_SECRET_KEY")!;
