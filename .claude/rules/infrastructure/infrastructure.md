@@ -45,15 +45,23 @@ Use `SharedInfrastructureConfiguration.IsRunningInScaleway` to detect cloud vs l
 
 ## Secrets Management
 
-Scaleway injects secrets as environment variables into Serverless Containers. No secrets SDK or Key Vault equivalent needed.
+Two layers, mirroring the original Azure Key Vault pattern:
+
+- **Scaleway Secret Manager** — `ScalewayTokenSigningClient` reads JWT signing key, issuer, and audience from the Secret Manager REST API at startup (like `AzureTokenSigningClient` read from Key Vault)
+- **Configuration provider** — `ScalewaySecretManagerConfigurationProvider` loads secrets into .NET `IConfiguration` with periodic refresh (like `AddAzureKeyVault`)
+- **Local dev** — `DevelopmentTokenSigningClient` reads from .NET user secrets (unchanged)
 
 Key environment variables in production:
 - `SCW_ACCESS_KEY`, `SCW_SECRET_KEY` — Scaleway API credentials
 - `SCW_DEFAULT_PROJECT_ID`, `SCW_DEFAULT_REGION` — Project and region
 - `S3_ENDPOINT` — Object Storage endpoint
 - `DATABASE_CONNECTION_STRING` — PostgreSQL connection string
-- `AUTHENTICATION_TOKEN_SIGNING_KEY`, `AUTHENTICATION_TOKEN_ISSUER`, `AUTHENTICATION_TOKEN_AUDIENCE` — JWT configuration
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SENDER_EMAIL_ADDRESS` — Email (TEM)
+
+Secrets stored in Scaleway Secret Manager (read via API, not env vars):
+- `authentication-token-signing-key` — JWT signing key (base64)
+- `authentication-token-issuer` — JWT issuer claim
+- `authentication-token-audience` — JWT audience claim
 
 ## Telemetry
 
