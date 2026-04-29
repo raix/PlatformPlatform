@@ -65,4 +65,12 @@ Secrets stored in Scaleway Secret Manager (read via API, not env vars):
 
 ## Telemetry
 
-Pure OpenTelemetry with OTLP exporter. No Application Insights. Configure `OTEL_EXPORTER_OTLP_ENDPOINT` to point to Scaleway Cockpit (Grafana) or any OTLP-compatible collector.
+Pure OpenTelemetry with OTLP exporter. No Application Insights. Scaleway Cockpit (Grafana) receives traces, metrics, and logs.
+
+Wire Cockpit to projects in the AppHost:
+```csharp
+builder.AddProject<MyApi>("api")
+    .WithScalewayCockpit(ScalewayRegion.FrPar, "data-source-id");
+```
+
+This sets per-signal OTLP endpoints and bearer token auth via `COCKPIT_TOKEN` env var. Scaleway Cockpit only supports HTTP/protobuf transport.
