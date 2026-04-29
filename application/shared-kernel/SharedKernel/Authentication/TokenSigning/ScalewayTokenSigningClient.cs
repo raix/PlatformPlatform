@@ -13,8 +13,13 @@ public sealed class ScalewayTokenSigningClient : ITokenSigningClient
     private readonly byte[] _key;
 
     public ScalewayTokenSigningClient()
-        : this(CreateDefaultHttpClient(), Environment.GetEnvironmentVariable("SCW_DEFAULT_REGION") ?? "fr-par", Environment.GetEnvironmentVariable("SCW_DEFAULT_PROJECT_ID")!)
     {
+        using var httpClient = CreateDefaultHttpClient();
+        var region = Environment.GetEnvironmentVariable("SCW_DEFAULT_REGION") ?? "fr-par";
+        var projectId = Environment.GetEnvironmentVariable("SCW_DEFAULT_PROJECT_ID")!;
+        _key = Convert.FromBase64String(GetSecretByName(httpClient, region, projectId, "authentication-token-signing-key"));
+        Issuer = GetSecretByName(httpClient, region, projectId, "authentication-token-issuer");
+        Audience = GetSecretByName(httpClient, region, projectId, "authentication-token-audience");
     }
 
     internal ScalewayTokenSigningClient(HttpClient httpClient, string region, string projectId)
@@ -55,7 +60,7 @@ public sealed class ScalewayTokenSigningClient : ITokenSigningClient
         response.EnsureSuccessStatusCode();
 
         var json = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
         var base64 = doc.RootElement.GetProperty("data").GetString()!;
         return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(base64));
     }

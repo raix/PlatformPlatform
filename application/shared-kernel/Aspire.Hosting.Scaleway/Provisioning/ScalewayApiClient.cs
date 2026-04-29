@@ -43,14 +43,14 @@ public sealed class ScalewayApiClient : IDisposable
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
 
         // Scaleway list APIs return objects with a single array property
         foreach (var property in doc.RootElement.EnumerateObject())
         {
             if (property.Value.ValueKind == JsonValueKind.Array)
             {
-                return property.Value.EnumerateArray().ToArray();
+                return property.Value.EnumerateArray().Select(e => e.Clone()).ToArray();
             }
         }
 
@@ -69,7 +69,8 @@ public sealed class ScalewayApiClient : IDisposable
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return JsonDocument.Parse(json).RootElement;
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.Clone();
     }
 
     /// <summary>
@@ -85,7 +86,8 @@ public sealed class ScalewayApiClient : IDisposable
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return JsonDocument.Parse(json).RootElement;
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.Clone();
     }
 
     /// <summary>
@@ -104,7 +106,8 @@ public sealed class ScalewayApiClient : IDisposable
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return JsonDocument.Parse(json).RootElement;
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.Clone();
     }
 
     /// <summary>

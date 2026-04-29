@@ -6,7 +6,7 @@ namespace Aspire.Hosting.Scaleway;
 /// Provisions Scaleway cloud resources by calling the Scaleway REST API directly.
 /// Uses tag-based find-or-create for idempotent deployments (no external state files).
 /// </summary>
-public sealed class ScalewayProvisioner
+public sealed class ScalewayProvisioner : IDisposable
 {
     private const string AspireAppTag = "aspire-app";
     private const string AspireResourceTag = "aspire-resource";
@@ -131,9 +131,14 @@ public sealed class ScalewayProvisioner
         return tags.ToArray();
     }
 
-    private static string GeneratePassword()
+    internal static string GeneratePassword()
     {
         return $"Aspire-{Guid.NewGuid():N}"[..32];
+    }
+
+    public void Dispose()
+    {
+        _client.Dispose();
     }
 }
 

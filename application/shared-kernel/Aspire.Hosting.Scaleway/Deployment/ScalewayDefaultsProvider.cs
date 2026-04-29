@@ -4,9 +4,8 @@ namespace Aspire.Hosting.Scaleway;
 /// Provides lazy-initialized shared Scaleway infrastructure resources.
 /// Mirrors the CDKDefaultsProvider pattern from the AWS Aspire package.
 /// Each property creates the resource on first access and caches it.
-/// Override virtual Create* methods to customize defaults.
 /// </summary>
-public class ScalewayDefaultsProvider
+public sealed class ScalewayDefaultsProvider
 {
     private readonly ScalewayEnvironmentResource _environment;
 
@@ -38,17 +37,17 @@ public class ScalewayDefaultsProvider
     public ScalewayContainerNamespaceConfig ContainerNamespace => _containerNamespace ??= CreateDefaultContainerNamespace();
     private ScalewayContainerNamespaceConfig? _containerNamespace;
 
-    protected virtual ScalewayPrivateNetworkConfig CreateDefaultPrivateNetwork()
+    private ScalewayPrivateNetworkConfig CreateDefaultPrivateNetwork()
     {
         return new ScalewayPrivateNetworkConfig($"{_environment.Name}-network", Region);
     }
 
-    protected virtual ScalewayRegistryConfig CreateDefaultRegistry()
+    private ScalewayRegistryConfig CreateDefaultRegistry()
     {
         return new ScalewayRegistryConfig($"{_environment.Name}-registry", Region);
     }
 
-    protected virtual ScalewayContainerNamespaceConfig CreateDefaultContainerNamespace()
+    private ScalewayContainerNamespaceConfig CreateDefaultContainerNamespace()
     {
         return new ScalewayContainerNamespaceConfig($"{_environment.Name}-containers", Region);
     }

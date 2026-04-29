@@ -76,11 +76,11 @@ public sealed class ScalewaySecretManagerConfigurationProvider : ConfigurationPr
         }
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
 
         if (doc.RootElement.TryGetProperty("secrets", out var secrets))
         {
-            return secrets.EnumerateArray().ToArray();
+            return secrets.EnumerateArray().Select(e => e.Clone()).ToArray();
         }
 
         return [];
@@ -97,7 +97,7 @@ public sealed class ScalewaySecretManagerConfigurationProvider : ConfigurationPr
         }
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
 
         if (doc.RootElement.TryGetProperty("data", out var data))
         {

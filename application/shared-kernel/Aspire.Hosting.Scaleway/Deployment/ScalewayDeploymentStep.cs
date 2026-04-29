@@ -104,7 +104,7 @@ public static class ScalewayDeploymentStep
             engine = config.Engine,
             node_type = config.NodeType,
             user_name = config.UserName,
-            password = GeneratePassword(),
+            password = ScalewayProvisioner.GeneratePassword(),
             is_ha_cluster = config.IsHaCluster,
             disable_backup = config.DisableBackup,
             volume_size = config.VolumeSizeInGb * 1_000_000_000,
@@ -132,7 +132,7 @@ public static class ScalewayDeploymentStep
             cluster_size = config.ClusterSize,
             tls_enabled = config.TlsEnabled,
             user_name = "default",
-            password = GeneratePassword(),
+            password = ScalewayProvisioner.GeneratePassword(),
             endpoints = new[] { new { private_network = new { id = privateNetworkId } } },
             tags = new[] { "aspire-managed" }
         }, cancellationToken);
@@ -236,11 +236,11 @@ public static class ScalewayDeploymentStep
                     }
                     else
                     {
-                        changes.AddRange(planner.PlanRdbUpdate(resource.Name, rdbAnnotation.Config, existingRdb.Value));
-                        if (changes.All(c => c.ChangeType != DeploymentChangeType.Update))
-                        {
+                        var updateChanges = planner.PlanRdbUpdate(resource.Name, rdbAnnotation.Config, existingRdb.Value);
+                        if (updateChanges.Count > 0)
+                            changes.AddRange(updateChanges);
+                        else
                             changes.Add(planner.PlanNoChange(resource.Name, "rdb"));
-                        }
                     }
                     break;
 
@@ -253,11 +253,11 @@ public static class ScalewayDeploymentStep
                     }
                     else
                     {
-                        changes.AddRange(planner.PlanRedisUpdate(resource.Name, redisAnnotation.Config, existingRedis.Value));
-                        if (changes.All(c => c.ChangeType != DeploymentChangeType.Update))
-                        {
+                        var updateChanges = planner.PlanRedisUpdate(resource.Name, redisAnnotation.Config, existingRedis.Value);
+                        if (updateChanges.Count > 0)
+                            changes.AddRange(updateChanges);
+                        else
                             changes.Add(planner.PlanNoChange(resource.Name, "redis"));
-                        }
                     }
                     break;
 
@@ -271,8 +271,4 @@ public static class ScalewayDeploymentStep
         return changes;
     }
 
-    private static string GeneratePassword()
-    {
-        return $"Aspire-{Guid.NewGuid():N}"[..32];
-    }
 }
