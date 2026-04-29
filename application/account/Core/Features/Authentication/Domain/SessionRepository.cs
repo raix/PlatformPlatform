@@ -55,7 +55,7 @@ public sealed class SessionRepository(AccountDbContext accountDbContext, IServic
     public async Task<bool> TryRefreshAsync(SessionId sessionId, RefreshTokenJti currentJti, int currentVersion, RefreshTokenJti newJti, DateTimeOffset now, CancellationToken cancellationToken)
     {
         // Create a new connection to ensure complete isolation from EF Core's transaction.
-        // Use NpgsqlDataSource from DI to preserve the Entra ID token provider configured for Azure.
+        // Use NpgsqlDataSource from DI to preserve any configured token provider.
         // For SQLite (tests), fall back to creating a raw connection from the connection string.
         await using var connection = serviceProvider.GetService(typeof(NpgsqlDataSource)) is NpgsqlDataSource npgsqlDataSource
             ? await npgsqlDataSource.OpenConnectionAsync(cancellationToken)

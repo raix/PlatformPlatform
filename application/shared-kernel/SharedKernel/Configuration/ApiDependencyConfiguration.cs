@@ -179,7 +179,7 @@ public static class ApiDependencyConfiguration
                         var tokenSigningService = SharedDependencyConfiguration.GetTokenSigningService();
                         o.TokenValidationParameters = tokenSigningService.GetTokenValidationParameters(
                             validateLifetime: true,
-                            clockSkew: TimeSpan.FromSeconds(5) // In Azure, we don't need any clock skew, but this must be a higher value than the AppGateway
+                            clockSkew: TimeSpan.FromSeconds(5) // Must be a higher value than the AppGateway
                         );
                     }
                 );
@@ -190,7 +190,7 @@ public static class ApiDependencyConfiguration
         public IServiceCollection AddHttpForwardHeaders()
         {
             // Ensure correct client IP addresses are set for requests
-            // This is required when running behind a reverse proxy like YARP or Azure Container Apps
+            // This is required when running behind a reverse proxy like YARP
             return services.Configure<ForwardedHeadersOptions>(options =>
                 {
                     // Enable support for proxy headers such as X-Forwarded-For and X-Forwarded-Proto

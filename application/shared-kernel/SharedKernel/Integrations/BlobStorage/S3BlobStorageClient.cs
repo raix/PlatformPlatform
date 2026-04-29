@@ -63,7 +63,7 @@ public sealed class S3BlobStorageClient(IAmazonS3 s3Client, string endpoint, Tim
             Protocol = Protocol.HTTPS
         });
 
-        // Return just the query string portion (like Azure SAS)
+        // Return just the query string portion
         var uri = new Uri(presignedUrl);
         return uri.Query;
     }
