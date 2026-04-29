@@ -11,8 +11,8 @@ public sealed class UpdateTenantLogoTests : EndpointBaseTest<AccountDbContext>
 {
     public UpdateTenantLogoTests()
     {
-        // Set up blob storage URL for tests - tests won't actually upload files
-        Environment.SetEnvironmentVariable("BLOB_STORAGE_URL", "https://test.blob.core.windows.net");
+        // Set up S3 endpoint for tests - tests won't actually upload files
+        Environment.SetEnvironmentVariable("S3_ENDPOINT", "http://localhost:8333");
     }
 
     [Fact]
