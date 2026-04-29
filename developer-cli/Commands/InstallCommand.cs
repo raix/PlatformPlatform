@@ -14,7 +14,7 @@ public class InstallCommand : Command
 
          [green]The CLI can be used to:[/]
          * Start all PlatformPlatform services locally in one command
-         * Be guided through setting up secure passwordless continuous deployments between GitHub and Azure
+         * Be guided through setting up deployments to Scaleway
          * Run static code analysis on your codebase to ensure it does not fail when running in GitHub Workflows
          * Run tests and show code coverage reports locally
          * Much more is coming soon!
@@ -30,7 +30,7 @@ public class InstallCommand : Command
          [green]How does it work?[/]
          The CLI has several commands that you can run from anywhere on your machine.
          Each command is one C# class that can be customized to automate your own workflows.
-         Each command check for its prerequisites (e.g., Docker, Node, Aspire, Azure CLI, etc.)
+         Each command check for its prerequisites (e.g., Docker, Node, Aspire, etc.)
          To remove the alias, just run [green]{Configuration.AliasName} uninstall[/].
 
          """;
