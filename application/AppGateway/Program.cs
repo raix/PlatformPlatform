@@ -18,7 +18,7 @@ builder.Services.AddSingleton<SharedAccessSignatureRequestTransform>();
 reverseProxyBuilder.AddTransforms(context => context.RequestTransforms.Add(context.Services.GetRequiredService<SharedAccessSignatureRequestTransform>())
 );
 
-builder.AddNamedBlobStorages([("account-storage", "ACCOUNT_STORAGE_URL")]);
+builder.AddNamedBlobStorages([("account-storage", "S3_ENDPOINT")]);
 
 builder.WebHost.UseKestrel(option => option.AddServerHeader = false);
 
