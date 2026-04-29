@@ -1,67 +1,20 @@
 ## Cloud Infrastructure
 
-This folder contains Bash and [Bicep](https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview) scripts used by [GitHub Actions](https://github.com/features/actions) to deploy resources to Azure.
+This folder will contain infrastructure configuration for Scaleway deployment.
 
-Bicep is an Infrastructure-as-Code (IaC) language specific to Azure. While Bicep is less mature than Terraform, it is a great choice for Azure-only projects. Unlike Terraform which often is many months behind, Bicep is always up to date with the latest Azure features, and as it matures, it will become the better choice for Azure infrastructure. The tooling is already much better than Terraform, and since Bicep is a typed language, you get intellisense and the compiler will catch many errors while writing the code.
+The application uses the `Aspire.Hosting.Scaleway` package (in `application/shared-kernel/Aspire.Hosting.Scaleway/`) to define and provision cloud resources. The deployment model uses direct Scaleway API calls with tag-based idempotency.
 
-## Getting started
+### Current deployment model
 
-Please follow the simple instructions in [Getting started](/README.md#setting-up-cicd-with-passwordless-deployments-from-github-to-azure-in-minutes) to setup passwordless deployments from GitHub to Azure.
+Resources are declared in the AppHost (`application/AppHost/Program.cs`) and provisioned via the `ScalewayDeploymentStep` which calls the Scaleway REST API directly. No external IaC tool (Terraform, Bicep) is required.
 
-## Folder structure
+### Scaleway services used
 
-- `environment`: Each environment (like `Staging` and `Production`) has resources that are shared between clusters, e.g., Azure Log Analytics workspace and Application Insights. This allows for central tracking and monitoring across clusters. No Personally Identifiable Information (PII) is tracked, which ensures compliance with data protection laws. See the [`environment/main-environment.bicep`](/cloud-infrastructure/environment/main-environment.bicep).
-- `cluster`: Scripts to deploy a cluster into clearly named resource groups like `ppdemo-stage-weu`, `ppdemo-prod-weu`, and `ppdemo-prod-eus2`. A cluster has its own Azure Container Apps environment (managed Kubernetes), PostgreSQL, Azure Blob Storage, etc. Tenants (a.k.a. a customer) are created in a dedicated cluster that contains all data belonging to that tenant. This ensures compliance with data protection laws like GDPR, CCPA, PIPEDA, APPs, etc., through geo-isolation. See the [`cluster/main-cluster.bicep`](/cloud-infrastructure/cluster/main-cluster.bicep).
-
-- `modules`: Each Azure Resource is created by a separate Bicep module file, ensuring a modular, reusable, and manageable infrastructure.
-
-All Azure resources are tagged with `environment` (e.g., `stage`, `prod`) and `managed-by` (e.g., `bicep`, `manual`) for easier cost tracking and resource management.
-## Cloud Infrastructure
-
-This folder contains Bash and [Bicep](https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview) scripts used by [GitHub Actions](https://github.com/features/actions) to deploy resources to Azure.
-
-Bicep is an Infrastructure-as-Code (IaC) language specific to Azure. While Bicep is less mature than Terraform, it is a great choice for Azure-only projects. Unlike Terraform which often is many months behind, Bicep is always up to date with the latest Azure features, and as it matures, it will become the better choice for Azure infrastructure. The tooling is already much better than Terraform, and since Bicep is a typed language, you get intellisense and the compiler will catch many errors while writing the code.
-
-## Getting started
-
-Please follow the simple instructions in [Getting started](/README.md#setting-up-cicd-with-passwordless-deployments-from-github-to-azure-in-minutes) to setup passwordless deployments from GitHub to Azure.
-
-## Folder structure
-
-- `environment`: Each environment (like `Staging` and `Production`) has resources that are shared between clusters, e.g., Azure Log Analytics workspace and Application Insights. This allows for central tracking and monitoring across clusters. No Personally Identifiable Information (PII) is tracked, which ensures compliance with data protection laws. See the [`environment/main-environment.bicep`](/cloud-infrastructure/environment/main-environment.bicep).
-- `cluster`: Scripts to deploy a cluster into clearly named resource groups like `ppdemo-stage-weu`, `ppdemo-prod-weu`, and `ppdemo-prod-eus2`. A cluster has its own Azure Container Apps environment (managed Kubernetes), PostgreSQL, Azure Blob Storage, etc. Tenants (a.k.a. a customer) are created in a dedicated cluster that contains all data belonging to that tenant. This ensures compliance with data protection laws like GDPR, CCPA, PIPEDA, APPs, etc., through geo-isolation. See the [`cluster/main-cluster.bicep`](/cloud-infrastructure/cluster/main-cluster.bicep).
-
-- `modules`: Each Azure Resource is created by a separate Bicep module file, ensuring a modular, reusable, and manageable infrastructure.
-
-### Naming Conventions
-
-Azure resources are named using the following convention: `uniquePrefix-environment-locationAcronym-name`.
-
-- `uniquePrefix` (2-6 characters): e.g., `pp`, `ppdemo`
-- `environment` (max 5 characters): e.g., `prod`, `dev`, `qa`, `stage`
-- `locationAcronym` (max 4 characters): e.g., `weu`, `eus2`
-- `name` (for some resources like storage accounts there is a max of 24 characters, so depending on the length of `uniquePrefix` this allows for 9-13 characters)
-
-There are a couple of exceptions:
-- Azure Storage Accounts, Azure Container Apps, etc., do not allow `-` in names
-- Child resources like Azure Container Apps (ACA) and SQL databases are not prefixed, as ACA has a limit of 32 characters, making names too cryptic
-
-Examples of cluster-specific resources:
-- Resource Group: `ppdemo-stage-weu`, `ppdemo-prod-eus2`
-- PostgreSQL: `ppdemo-stage-weu`, `ppdemo-prod-eus2`
-- PostgreSQL database: `main`, `account`, `back-office`
-- Azure Container App Environment: `ppdemo-stage-weu`, `ppdemo-prod-eus2`
-- Azure Container Apps: `main-api`, `account-api`, `back-office-worker`
-- Managed Identity: `ppdemo-stage-weu-main`, `ppdemo-stage-weu-account`, `ppdemo-prod-eus2-back-office`
-- Key Vault: `ppdemo-stage-weu`, `ppdemo-prod-eus2`
-- Virtual Network: `ppdemo-stage-weu`, `ppdemo-prod-eus2`
-- Communication Service: `ppdemo-stage-weu`, `ppdemo-prod-eus2`
-- Storage Accounts: `ppdemostageweuacctmgmt`, `ppdemoprodweudiagnostic`
-
-Examples of global resources (shared across all clusters in an environment):
-- Resource Group: `ppdemo-stage-global`, `ppdemo-prod-global`
-- Application Insights: `ppdemo-stage`, `ppdemo-prod`
-- Log Analytics workspace: `ppdemo-stage`, `ppdemo-prod`
-- Container Registry: `ppdemostage`, `ppdemoprod`
-
-All Azure resources are tagged with `environment` (e.g., `stage`, `prod`) and `managed-by` (e.g., `bicep`, `manual`) for easier cost tracking and resource management.
+- **Serverless Containers** — Application hosting (APIs, workers)
+- **Managed PostgreSQL (RDB)** — Database per self-contained system
+- **Object Storage** — S3-compatible blob storage (avatars, logos)
+- **Transactional Email (TEM)** — SMTP email delivery
+- **Container Registry** — Docker image storage
+- **Secret Manager** — JWT keys, SMTP credentials
+- **Cockpit** — Grafana-based observability (via OpenTelemetry)
+- **Private Networks** — Network isolation between resources
