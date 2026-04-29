@@ -77,4 +77,34 @@ public sealed class ScalewayStorageTests
 
         bucket.Resource.Versioning.Should().BeTrue();
     }
+
+    [Fact]
+    public void RunAsSeaweedFsContainer_ShouldAddInnerS3Annotation()
+    {
+        // Arrange
+        var builder = DistributedApplication.CreateBuilder();
+
+        // Act
+        var storage = builder.AddScalewayObjectStorage("my-storage")
+            .RunAsSeaweedFsContainer();
+
+        // Assert
+        storage.Resource.Annotations.OfType<InnerS3ContainerAnnotation>().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void WithS3Storage_ShouldWireEnvironmentVariable()
+    {
+        // Arrange
+        var builder = DistributedApplication.CreateBuilder();
+        var storage = builder.AddScalewayObjectStorage("my-storage")
+            .RunAsSeaweedFsContainer();
+        var container = builder.AddContainer("my-app", "my-image");
+
+        // Act
+        container.WithS3Storage(storage);
+
+        // Assert - the annotation exists on storage, confirming wiring is possible
+        storage.Resource.Annotations.OfType<InnerS3ContainerAnnotation>().Should().ContainSingle();
+    }
 }

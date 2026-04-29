@@ -122,6 +122,25 @@ public sealed class ScalewayProvisionerTests
     }
 
     [Fact]
+    public void Constructor_WhenMissingProjectId_ShouldThrowInvalidOperationException()
+    {
+        // Arrange
+        var credentials = new ScalewayCredentialConfig
+        {
+            AccessKey = "SCW-ACCESS-KEY",
+            SecretKey = "SCW-SECRET-KEY",
+            DefaultProjectId = null
+        };
+
+        // Act
+        var act = () => new ScalewayProvisioner(credentials, "my-app");
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*SCW_DEFAULT_PROJECT_ID*");
+    }
+
+    [Fact]
     public async Task ProvisionRdbInstance_ShouldUseConfiguredRegion()
     {
         // Arrange

@@ -1,3 +1,4 @@
+using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
@@ -43,5 +44,38 @@ public sealed class ScalewayRedisTests
         var redis = builder.AddScalewayRedisCluster("my-cache");
 
         redis.Resource.Should().BeAssignableTo<IScalewayResource>();
+    }
+
+    [Fact]
+    public void RunAsRedisContainer_ShouldAddConnectionStringRedirectAnnotation()
+    {
+        // Arrange
+        var builder = DistributedApplication.CreateBuilder();
+
+        // Act
+        var redis = builder.AddScalewayRedisCluster("my-cache")
+            .RunAsRedisContainer();
+
+        // Assert
+        redis.Resource.Annotations.OfType<ConnectionStringRedirectAnnotation>().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void RunAsRedisContainer_ConfiguresInnerContainer()
+    {
+        // Arrange
+        var builder = DistributedApplication.CreateBuilder();
+        var configured = false;
+
+        // Act
+        builder.AddScalewayRedisCluster("my-cache")
+            .RunAsRedisContainer(c =>
+            {
+                configured = true;
+                c.WithLifetime(ContainerLifetime.Persistent);
+            });
+
+        // Assert
+        configured.Should().BeTrue();
     }
 }

@@ -31,12 +31,12 @@ public sealed class DeploymentPlannerTests
     [Fact]
     public void PlanDelete_WhenDeletePolicyOnDataResource_ShouldBeBlocked()
     {
-        // Even with explicit Delete, data-bearing resources with default Retain should block
-        // This tests the safety net - the default policy for "rdb" is Retain
+        // Data-bearing resources with default Retain policy should block deletion
         var change = _planner.PlanDelete("my-db", "rdb", DeletionPolicy.Delete);
 
-        // When explicitly set to Delete, it should be allowed (user made conscious choice)
         change.ChangeType.Should().Be(DeploymentChangeType.Delete);
+        change.Severity.Should().Be(DeploymentChangeSeverity.Blocked);
+        change.IsBlocked.Should().BeTrue();
     }
 
     [Fact]
@@ -193,5 +193,23 @@ public sealed class DeploymentPlannerTests
     {
         DeploymentPlanner.GetDefaultDeletionPolicy("container").Should().Be(DeletionPolicy.Delete);
         DeploymentPlanner.GetDefaultDeletionPolicy("dns-record").Should().Be(DeletionPolicy.Delete);
+    }
+
+    [Fact]
+    public void PlanRedisUpdate_WhenNodeTypeChanges_ShouldWarn()
+    {
+        // Arrange
+        var existing = JsonDocument.Parse("""{"zone": "fr-par-1", "node_type": "RED1-MICRO", "cluster_size": 1}""").RootElement;
+        var desired = new ScalewayRedisPublishConfig { Zone = ScalewayZone.FrPar1, NodeType = "RED1-SM", ClusterSize = 1 };
+
+        // Act
+        var changes = _planner.PlanRedisUpdate("my-cache", desired, existing);
+
+        // Assert
+        changes.Should().HaveCount(1);
+        changes[0].Severity.Should().Be(DeploymentChangeSeverity.Warning);
+        changes[0].IsBlocked.Should().BeFalse();
+        changes[0].Description.Should().Contain("node_type");
+        changes[0].Description.Should().Contain("downtime");
     }
 }

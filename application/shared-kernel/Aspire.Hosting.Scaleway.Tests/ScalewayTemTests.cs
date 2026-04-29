@@ -29,4 +29,18 @@ public sealed class ScalewayTemTests
         tem.Resource.DomainName.Should().Be("example.com");
         tem.Resource.AcceptTos.Should().BeTrue();
     }
+
+    [Fact]
+    public void RunAsMailpitContainer_ShouldNotThrow()
+    {
+        // Arrange
+        var builder = DistributedApplication.CreateBuilder();
+
+        // Act
+        var act = () => builder.AddScalewayTemDomain("my-email")
+            .RunAsMailpitContainer();
+
+        // Assert
+        act.Should().NotThrow();
+    }
 }
