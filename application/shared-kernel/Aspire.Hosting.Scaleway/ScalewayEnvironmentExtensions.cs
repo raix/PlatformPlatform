@@ -6,7 +6,8 @@ public static class ScalewayEnvironmentExtensions
 {
     /// <summary>
     /// Adds a Scaleway deployment environment to the distributed application.
-    /// This serves as the root deployment target for all Scaleway resources.
+    /// This is the root resource that owns shared infrastructure: private network, container registry,
+    /// and container namespace. Mirrors the AWSCDKEnvironmentResource pattern.
     /// </summary>
     public static IResourceBuilder<ScalewayEnvironmentResource> AddScalewayEnvironment(
         this IDistributedApplicationBuilder builder,
@@ -24,7 +25,8 @@ public static class ScalewayEnvironmentExtensions
             ApiUrl = Environment.GetEnvironmentVariable("SCW_API_URL") ?? "https://api.scaleway.com"
         };
 
-        var resource = new ScalewayEnvironmentResource(name, config);
+        var isPublishMode = builder.ExecutionContext.IsPublishMode;
+        var resource = new ScalewayEnvironmentResource(name, config, isPublishMode);
         return builder.AddResource(resource);
     }
 }
