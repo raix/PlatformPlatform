@@ -23,6 +23,13 @@ public sealed class ScalewayProvisioner
             ?? throw new InvalidOperationException("SCW_DEFAULT_PROJECT_ID is required for provisioning.");
     }
 
+    internal ScalewayProvisioner(HttpClient httpClient, string appName, string projectId)
+    {
+        _client = new ScalewayApiClient(httpClient);
+        _appName = appName;
+        _projectId = projectId;
+    }
+
     /// <summary>
     /// Provisions or updates a Scaleway RDB instance.
     /// </summary>

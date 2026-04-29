@@ -27,6 +27,12 @@ public sealed class ScalewayApiClient : IDisposable
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
+    internal ScalewayApiClient(HttpClient httpClient)
+    {
+        _credentials = new ScalewayCredentialConfig();
+        _httpClient = httpClient;
+    }
+
     /// <summary>
     /// Lists resources of a given type, optionally filtered by tags.
     /// </summary>

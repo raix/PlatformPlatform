@@ -11,6 +11,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="Aspire.Hosting.Scaleway.Tests"/>
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Aspire.Hosting"/>
         <PackageReference Include="Aspire.Hosting.PostgreSQL"/>
         <PackageReference Include="Aspire.Hosting.Redis"/>
