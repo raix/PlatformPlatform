@@ -32,7 +32,7 @@ public static class SharedDependencyConfiguration
     {
         if (SharedInfrastructureConfiguration.IsRunningInScaleway)
         {
-            return new EnvironmentTokenSigningClient();
+            return new ScalewayTokenSigningClient();
         }
 
         return new DevelopmentTokenSigningClient();
