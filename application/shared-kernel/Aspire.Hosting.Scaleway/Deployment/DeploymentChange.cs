@@ -8,7 +8,8 @@ public sealed record DeploymentChange(
     string ResourceName,
     DeploymentChangeType ChangeType,
     DeploymentChangeSeverity Severity,
-    string Description)
+    string Description,
+    CostEstimate? Cost = null)
 {
     public bool IsBlocked => Severity == DeploymentChangeSeverity.Blocked;
 }
