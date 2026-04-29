@@ -15,10 +15,18 @@ public static class ScalewayDeploymentStep
         IEnumerable<IResource> resources,
         CancellationToken cancellationToken)
     {
-        var credentials = environment.CredentialConfig;
-        using var apiClient = new ScalewayApiClient(credentials);
-        var region = credentials.DefaultRegion.ToApiString();
-        var projectId = credentials.DefaultProjectId!;
+        using var apiClient = new ScalewayApiClient(environment.CredentialConfig);
+        await DeployAsync(environment, resources, apiClient, cancellationToken);
+    }
+
+    internal static async Task DeployAsync(
+        ScalewayEnvironmentResource environment,
+        IEnumerable<IResource> resources,
+        ScalewayApiClient apiClient,
+        CancellationToken cancellationToken)
+    {
+        var region = environment.CredentialConfig.DefaultRegion.ToApiString();
+        var projectId = environment.CredentialConfig.DefaultProjectId!;
 
         // Step 1: Create shared infrastructure
         var privateNetwork = await ProvisionPrivateNetworkAsync(apiClient, region, projectId, environment.DefaultsProvider.PrivateNetwork, cancellationToken);
@@ -183,7 +191,84 @@ public static class ScalewayDeploymentStep
         var resources = await apiClient.ListResourcesAsync(apiPath, regionOrZone,
             new Dictionary<string, string> { ["project_id"] = projectId, ["name"] = name }, cancellationToken);
 
-        return resources.FirstOrDefault(r => r.TryGetProperty("name", out var n) && n.GetString() == name);
+        var match = resources.FirstOrDefault(r => r.TryGetProperty("name", out var n) && n.GetString() == name);
+        return match.ValueKind == JsonValueKind.Undefined ? null : match;
+    }
+
+    /// <summary>
+    /// Performs a dry run: compares desired state against actual Scaleway resources and returns a plan
+    /// without making any changes. Uses the DeploymentPlanner for safety classification.
+    /// </summary>
+    internal static async Task<List<DeploymentChange>> DryRunAsync(
+        ScalewayEnvironmentResource environment,
+        IEnumerable<IResource> resources,
+        ScalewayApiClient apiClient,
+        CancellationToken cancellationToken)
+    {
+        var region = environment.CredentialConfig.DefaultRegion.ToApiString();
+        var projectId = environment.CredentialConfig.DefaultProjectId!;
+        var planner = new DeploymentPlanner();
+        var changes = new List<DeploymentChange>();
+
+        // Check shared infrastructure
+        var existingNetwork = await FindByNameAsync(apiClient, $"vpc/v2/regions/{region}/private-networks", region, projectId, environment.DefaultsProvider.PrivateNetwork.Name, "private_networks", cancellationToken);
+        changes.Add(existingNetwork is not null ? planner.PlanNoChange(environment.DefaultsProvider.PrivateNetwork.Name, "private-network") : planner.PlanCreate(environment.DefaultsProvider.PrivateNetwork.Name, "private-network"));
+
+        var existingRegistry = await FindByNameAsync(apiClient, $"registry/v1/regions/{region}/namespaces", region, projectId, environment.DefaultsProvider.Registry.Name, "namespaces", cancellationToken);
+        changes.Add(existingRegistry is not null ? planner.PlanNoChange(environment.DefaultsProvider.Registry.Name, "registry") : planner.PlanCreate(environment.DefaultsProvider.Registry.Name, "registry"));
+
+        // Check each resource with a publish annotation
+        foreach (var resource in resources)
+        {
+            var annotation = resource.Annotations.OfType<IScalewayPublishTargetAnnotation>().FirstOrDefault();
+            if (annotation is null)
+            {
+                continue;
+            }
+
+            switch (annotation)
+            {
+                case PublishAsScalewayRdbAnnotation rdbAnnotation:
+                    var existingRdb = await FindByNameAsync(apiClient, $"rdb/v1/regions/{region}/instances", region, projectId, resource.Name, "instances", cancellationToken);
+                    if (existingRdb is null)
+                    {
+                        changes.Add(planner.PlanCreate(resource.Name, "rdb"));
+                    }
+                    else
+                    {
+                        changes.AddRange(planner.PlanRdbUpdate(resource.Name, rdbAnnotation.Config, existingRdb.Value));
+                        if (changes.All(c => c.ChangeType != DeploymentChangeType.Update))
+                        {
+                            changes.Add(planner.PlanNoChange(resource.Name, "rdb"));
+                        }
+                    }
+                    break;
+
+                case PublishAsScalewayRedisAnnotation redisAnnotation:
+                    var zone = redisAnnotation.Config.Zone.ToApiString();
+                    var existingRedis = await FindByNameAsync(apiClient, $"redis/v1/zones/{zone}/clusters", zone, projectId, resource.Name, "clusters", cancellationToken);
+                    if (existingRedis is null)
+                    {
+                        changes.Add(planner.PlanCreate(resource.Name, "redis"));
+                    }
+                    else
+                    {
+                        changes.AddRange(planner.PlanRedisUpdate(resource.Name, redisAnnotation.Config, existingRedis.Value));
+                        if (changes.All(c => c.ChangeType != DeploymentChangeType.Update))
+                        {
+                            changes.Add(planner.PlanNoChange(resource.Name, "redis"));
+                        }
+                    }
+                    break;
+
+                case PublishAsScalewayContainerAnnotation:
+                    var existingContainer = await FindByNameAsync(apiClient, $"containers/v1beta1/regions/{region}/containers", region, projectId, resource.Name, "containers", cancellationToken);
+                    changes.Add(existingContainer is null ? planner.PlanCreate(resource.Name, "container") : planner.PlanNoChange(resource.Name, "container"));
+                    break;
+            }
+        }
+
+        return changes;
     }
 
     private static string GeneratePassword()
