@@ -23,4 +23,9 @@ public sealed class ScalewayEnvironmentResource : Resource
     /// Provides lazy-initialized shared infrastructure (private network, registry, container namespace).
     /// </summary>
     public ScalewayDefaultsProvider DefaultsProvider { get; }
+
+    /// <summary>
+    /// Maximum monthly budget in EUR. If set, deployments that exceed this budget are blocked.
+    /// </summary>
+    public decimal? MonthlyBudget { get; internal set; }
 }

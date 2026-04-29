@@ -29,4 +29,15 @@ public static class ScalewayEnvironmentExtensions
         var resource = new ScalewayEnvironmentResource(name, config, isPublishMode);
         return builder.AddResource(resource);
     }
+
+    /// <summary>
+    /// Sets a maximum monthly budget in EUR. Deployments that exceed this budget are blocked during dry-run.
+    /// </summary>
+    public static IResourceBuilder<ScalewayEnvironmentResource> WithMonthlyBudget(
+        this IResourceBuilder<ScalewayEnvironmentResource> builder,
+        decimal maxMonthlyEur)
+    {
+        builder.Resource.MonthlyBudget = maxMonthlyEur;
+        return builder;
+    }
 }
