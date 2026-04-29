@@ -36,4 +36,6 @@ public sealed class ScalewayContainerPublishConfig
     public string[]? Tags { get; set; }
 
     public ScalewayRegion Region { get; set; } = ScalewayRegion.FrPar;
+
+    public DeletionPolicy DeletionPolicy { get; set; } = DeletionPolicy.Delete;
 }

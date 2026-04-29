@@ -24,4 +24,6 @@ public sealed class ScalewayRedisPublishConfig
     public string[]? Tags { get; set; }
 
     public ScalewayZone Zone { get; set; } = ScalewayZone.FrPar1;
+
+    public DeletionPolicy DeletionPolicy { get; set; } = DeletionPolicy.Retain;
 }
