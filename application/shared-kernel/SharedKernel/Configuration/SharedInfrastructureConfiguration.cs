@@ -23,6 +23,11 @@ public static class SharedInfrastructureConfiguration
         public IHostApplicationBuilder AddSharedInfrastructure<T>(string connectionName)
             where T : DbContext
         {
+            if (IsRunningInScaleway)
+            {
+                builder.Configuration.AddScalewaySecretManager(reloadInterval: TimeSpan.FromMinutes(1));
+            }
+
             builder
                 .ConfigureDatabaseContext<T>(connectionName)
                 .AddDefaultBlobStorage()
