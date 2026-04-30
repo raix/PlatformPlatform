@@ -11,6 +11,7 @@ internal static class AppHostRunner
 {
     public static async Task<AppHostRunResult> RunDeployAsync(
         string mockServerUrl,
+        IReadOnlyDictionary<string, string>? extraEnvironment = null,
         TimeSpan? timeout = null,
         CancellationToken cancellationToken = default)
     {
@@ -42,6 +43,14 @@ internal static class AppHostRunner
                 ["APPHOST_SKIP_PORT_CHECK"] = "1"
             }
         };
+
+        if (extraEnvironment is not null)
+        {
+            foreach (var (key, value) in extraEnvironment)
+            {
+                psi.Environment[key] = value;
+            }
+        }
 
         using var process = new Process();
         process.StartInfo = psi;

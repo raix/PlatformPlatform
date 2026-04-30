@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Aspire.Hosting.Pipelines;
 using Microsoft.Extensions.Logging;
@@ -55,7 +56,8 @@ internal static class ScalewayPipelineStep
 
         DeploymentCostSummary? costSummary = null;
         BudgetCheckResult? budgetCheck = null;
-        if (environment.MonthlyBudget is { } budget)
+        var effectiveBudget = ResolveMonthlyBudget(environment);
+        if (effectiveBudget is { } budget)
         {
             costSummary = costEstimator is not null
                 ? await costEstimator(publishResources, cancellationToken)
@@ -74,7 +76,39 @@ internal static class ScalewayPipelineStep
             throw new DistributedApplicationException(BuildBlockedMessage(environment, plan));
         }
 
-        await ScalewayDeploymentStep.DeployAsync(environment, publishResources, apiClient, cancellationToken);
+        var approver = SelectApprover();
+        await ScalewayDeploymentStep.DeployAsync(environment, publishResources, apiClient, approver, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Returns the budget that should gate this deploy. <c>SCW_MONTHLY_BUDGET</c> always
+    ///     wins over <see cref="ScalewayEnvironmentResource.MonthlyBudget" /> so QA runs can
+    ///     dial the gate up or down without editing AppHost code.
+    /// </summary>
+    internal static decimal? ResolveMonthlyBudget(ScalewayEnvironmentResource environment)
+    {
+        var fromEnv = Environment.GetEnvironmentVariable("SCW_MONTHLY_BUDGET");
+        if (fromEnv is not null && decimal.TryParse(fromEnv, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return parsed;
+        }
+
+        return environment.MonthlyBudget;
+    }
+
+    /// <summary>
+    ///     Selects an interactive approver only when explicitly opted in and a real terminal is
+    ///     attached. CI subprocesses (no TTY) silently fall back to <see cref="AutoApprover" />.
+    /// </summary>
+    internal static IDeployApprover SelectApprover()
+    {
+        var optIn = Environment.GetEnvironmentVariable("SCALEWAY_DEPLOY_INTERACTIVE") == "1";
+        if (optIn && !Console.IsInputRedirected)
+        {
+            return new InteractiveConsoleApprover();
+        }
+
+        return new AutoApprover();
     }
 
     private static async Task<DeploymentCostSummary> EstimateWithDefaultClientAsync(

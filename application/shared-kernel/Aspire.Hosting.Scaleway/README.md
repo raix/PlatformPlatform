@@ -279,6 +279,40 @@ This fetches `types.gen.ts` from `scaleway/scaleway-sdk-js` on GitHub, parses `C
 | `COCKPIT_TOKEN` | Scaleway Cockpit push token |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry collector endpoint |
 
+## Manual QA against a real Scaleway project
+
+For first-time rollouts and high-stakes changes, you can step through the deploy and verify each provisioned resource in the Scaleway console before continuing. Two opt-in env vars enable this:
+
+| Variable | Purpose |
+|----------|---------|
+| `SCALEWAY_DEPLOY_INTERACTIVE=1` | Pause before each app-level resource and prompt `[a]pply / [s]kip / [q]uit`. Shared infrastructure (private network, registry namespace) is still auto-applied. The flag is ignored when stdin isn't a terminal — CI runs always fail fast. |
+| `SCW_MONTHLY_BUDGET=<eur>` | Override the AppHost's `WithMonthlyBudget(...)` value at deploy time. Useful for QA projects with a tight cap. |
+
+A typical QA loop:
+
+```bash
+# Point at a dedicated QA Scaleway project
+export SCW_DEFAULT_PROJECT_ID=<qa-project-id>
+export SCW_ACCESS_KEY=<qa-key>
+export SCW_SECRET_KEY=<qa-secret>
+
+# Cap monthly spend to a safe ceiling
+export SCW_MONTHLY_BUDGET=20
+
+# Step through each resource
+export SCALEWAY_DEPLOY_INTERACTIVE=1
+aspire deploy --apphost application/AppHost/AppHost.csproj
+```
+
+The deploy prints the dry-run plan first (changes + cost + budget verdict). If `CanDeploy` is true, it then walks each app resource:
+
+```
+Next change: rdb 'postgres'
+[a]pply / [s]kip / [q]uit > a
+```
+
+`q` aborts the entire deploy — half-provisioned state stays as-is and the next deploy reconciles.
+
 ## Testing
 
 ### Unit tests

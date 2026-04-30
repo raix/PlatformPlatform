@@ -15,8 +15,17 @@ public static class ScalewayDeploymentStep
         IEnumerable<IResource> resources,
         CancellationToken cancellationToken)
     {
+        await DeployAsync(environment, resources, new AutoApprover(), cancellationToken);
+    }
+
+    public static async Task DeployAsync(
+        ScalewayEnvironmentResource environment,
+        IEnumerable<IResource> resources,
+        IDeployApprover approver,
+        CancellationToken cancellationToken)
+    {
         using var apiClient = new ScalewayApiClient(environment.CredentialConfig);
-        await DeployAsync(environment, resources, apiClient, cancellationToken);
+        await DeployAsync(environment, resources, apiClient, approver, cancellationToken);
     }
 
     internal static async Task DeployAsync(
@@ -25,19 +34,49 @@ public static class ScalewayDeploymentStep
         ScalewayApiClient apiClient,
         CancellationToken cancellationToken)
     {
+        await DeployAsync(environment, resources, apiClient, new AutoApprover(), cancellationToken);
+    }
+
+    internal static async Task DeployAsync(
+        ScalewayEnvironmentResource environment,
+        IEnumerable<IResource> resources,
+        ScalewayApiClient apiClient,
+        IDeployApprover approver,
+        CancellationToken cancellationToken)
+    {
         var region = environment.CredentialConfig.DefaultRegion.ToApiString();
         var projectId = environment.CredentialConfig.DefaultProjectId!;
 
         // Step 1: Create shared infrastructure. The registry namespace is provisioned for image
         // pushes but its ID is not needed downstream — containers use the container namespace.
+        // Shared infra is auto-applied; the approver only gates app-level resources.
         var privateNetwork = await ProvisionPrivateNetworkAsync(apiClient, region, projectId, environment.DefaultsProvider.PrivateNetwork, cancellationToken);
         await ProvisionRegistryNamespaceAsync(apiClient, region, projectId, environment.DefaultsProvider.Registry, cancellationToken);
 
-        // Step 2: Provision each resource with a publish annotation
+        // Step 2: Provision each resource with a publish annotation, gated through the approver.
         foreach (var resource in resources)
         {
             var publishAnnotation = resource.Annotations.OfType<IScalewayPublishTargetAnnotation>().FirstOrDefault();
             if (publishAnnotation is null)
+            {
+                continue;
+            }
+
+            var resourceType = publishAnnotation switch
+            {
+                PublishAsScalewayRdbAnnotation => "rdb",
+                PublishAsScalewayRedisAnnotation => "redis",
+                PublishAsScalewayContainerAnnotation => "container",
+                _ => publishAnnotation.GetType().Name
+            };
+
+            var decision = await approver.ApproveAsync(resource.Name, resourceType, cancellationToken);
+            if (decision == DeployApproverDecision.Abort)
+            {
+                throw new DistributedApplicationException($"Deploy aborted by approver at '{resource.Name}'.");
+            }
+
+            if (decision == DeployApproverDecision.Skip)
             {
                 continue;
             }

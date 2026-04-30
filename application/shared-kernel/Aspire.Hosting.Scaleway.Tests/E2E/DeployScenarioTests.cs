@@ -72,6 +72,73 @@ public sealed class DeployScenarioTests
         mockServer.ReceivedRequests.Where(r => r.Method == "POST").Should().BeEmpty("no POSTs should be issued when the plan is blocked");
     }
 
+    [Fact]
+    public async Task Deploy_WhenRdbExistsWithDifferentNodeType_ProducesWarningButProceeds()
+    {
+        using var mockServer = new ScalewayMockServer();
+        mockServer.Start();
+
+        // Pre-seed an RDB matching the AppHost's engine, but with a different node_type
+        // (a warning-severity field — the planner reports a warning but does not block).
+        // Other resources are missing so the deploy still has work to do for them.
+        mockServer.Seed("instances", new
+            {
+                id = "rdb-existing",
+                name = "postgres",
+                engine = "PostgreSQL-16",
+                node_type = "DB-DEV-M",
+                region = "fr-par",
+                status = "ready"
+            }
+        );
+
+        var result = await AppHostRunner.RunDeployAsync(mockServer.Url);
+
+        result.ExitCode.Should().Be(0, "warnings on mutable fields should not block deploy.\n{0}", result.CombinedOutput);
+        // The warning is informational; today's DeployAsync only creates missing resources, so the
+        // existing RDB is left alone (no PATCH, no second POST). Containers and namespaces still get POSTed.
+        var rdbPosts = mockServer.ReceivedRequests.Where(r => r.Method == "POST" && r.Path.Contains("rdb/v1") && r.Path.Contains("instances")).ToList();
+        rdbPosts.Should().BeEmpty("the existing RDB should not be re-created");
+    }
+
+    [Fact]
+    public async Task Deploy_WhenBudgetEnvVarOverridesAndExceeds_AbortsWithBudgetMessage()
+    {
+        using var mockServer = new ScalewayMockServer();
+        mockServer.Start();
+
+        // Seed the Scaleway product catalog with a high price for DB-DEV-S so the cost estimate
+        // is non-zero. Pricing client multiplies hourly rate by 730 hours/month.
+        mockServer.Seed("products", new
+            {
+                variant = "DB-DEV-S",
+                price = new { retail_price = new { units = 5, nanos = 0 } }
+            }
+        );
+
+        // SCW_MONTHLY_BUDGET wins over any AppHost-configured budget. €1 cap, €3650 estimate => abort.
+        var extraEnv = new Dictionary<string, string> { ["SCW_MONTHLY_BUDGET"] = "1" };
+        var result = await AppHostRunner.RunDeployAsync(mockServer.Url, extraEnv);
+
+        result.ExitCode.Should().NotBe(0, "over-budget deploys must abort.\n{0}", result.CombinedOutput);
+        result.CombinedOutput.Should().Contain("exceeds budget");
+        mockServer.ReceivedRequests.Where(r => r.Method == "POST").Should().BeEmpty("no provisioning POSTs should be issued when over budget");
+    }
+
+    [Fact]
+    public async Task Deploy_WhenBudgetEnvVarSetAndUnderLimit_Succeeds()
+    {
+        using var mockServer = new ScalewayMockServer();
+        mockServer.Start();
+
+        // No catalog seed → pricing client returns 0 for everything. Any positive budget passes.
+        var extraEnv = new Dictionary<string, string> { ["SCW_MONTHLY_BUDGET"] = "1000" };
+        var result = await AppHostRunner.RunDeployAsync(mockServer.Url, extraEnv);
+
+        result.ExitCode.Should().Be(0, "deploy with budget headroom should succeed.\n{0}", result.CombinedOutput);
+        result.CombinedOutput.Should().Contain("within budget");
+    }
+
     private static void SeedFullDeploymentState(ScalewayMockServer mockServer)
     {
         mockServer.Seed("private-networks", new { id = "pn-1", name = "scaleway-network", region = "fr-par" });

@@ -163,6 +163,89 @@ public sealed class ScalewayPipelineStepTests : IDisposable
         ScalewayPipelineStep.StepNameFor(production).Should().Contain("production");
     }
 
+    [Fact]
+    public void ResolveMonthlyBudget_WithEnvVar_OverridesConfiguredBudget()
+    {
+        var environment = new ScalewayEnvironmentResource("production", new ScalewayCredentialConfig(), true)
+        {
+            MonthlyBudget = 100m
+        };
+
+        Environment.SetEnvironmentVariable("SCW_MONTHLY_BUDGET", "25.50");
+        try
+        {
+            ScalewayPipelineStep.ResolveMonthlyBudget(environment).Should().Be(25.50m);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SCW_MONTHLY_BUDGET", null);
+        }
+    }
+
+    [Fact]
+    public void ResolveMonthlyBudget_WithoutEnvVar_ReturnsConfiguredBudget()
+    {
+        var environment = new ScalewayEnvironmentResource("production", new ScalewayCredentialConfig(), true)
+        {
+            MonthlyBudget = 100m
+        };
+
+        Environment.SetEnvironmentVariable("SCW_MONTHLY_BUDGET", null);
+        ScalewayPipelineStep.ResolveMonthlyBudget(environment).Should().Be(100m);
+    }
+
+    [Fact]
+    public void SelectApprover_WhenInteractiveOptInAndStdinIsRedirected_FallsBackToAutoApprover()
+    {
+        Environment.SetEnvironmentVariable("SCALEWAY_DEPLOY_INTERACTIVE", "1");
+        try
+        {
+            // The xUnit runner redirects stdin, so the TTY check fails and we get AutoApprover.
+            ScalewayPipelineStep.SelectApprover().Should().BeOfType<AutoApprover>();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SCALEWAY_DEPLOY_INTERACTIVE", null);
+        }
+    }
+
+    [Fact]
+    public void SelectApprover_WithoutOptIn_ReturnsAutoApprover()
+    {
+        Environment.SetEnvironmentVariable("SCALEWAY_DEPLOY_INTERACTIVE", null);
+        ScalewayPipelineStep.SelectApprover().Should().BeOfType<AutoApprover>();
+    }
+
+    [Fact]
+    public async Task DeployAsync_WhenApproverSkipsRdb_DoesNotCreateInstance()
+    {
+        var environment = CreateEnvironment("production");
+        var rdb = CreateRdbResource("my-db", new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" });
+
+        var approver = new ScriptedApprover([DeployApproverDecision.Skip]);
+        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], approver, CancellationToken.None);
+
+        _mockServer.Resources.Should().NotContainKey("instances", "the rdb POST should be skipped when approver returns Skip");
+    }
+
+    [Fact]
+    public async Task DeployAsync_WhenApproverAborts_ThrowsBeforeApplyingRemainingResources()
+    {
+        var environment = CreateEnvironment("production");
+        var rdb = CreateRdbResource("first-db", new ScalewayRdbPublishConfig());
+        var rdb2 = CreateRdbResource("second-db", new ScalewayRdbPublishConfig());
+
+        var approver = new ScriptedApprover([DeployApproverDecision.Apply, DeployApproverDecision.Abort]);
+
+        var act = async () => await ScalewayDeploymentStep.DeployAsync(environment, [rdb, rdb2], approver, CancellationToken.None);
+
+        await act.Should().ThrowAsync<DistributedApplicationException>()
+            .Where(ex => ex.Message.Contains("aborted") && ex.Message.Contains("'second-db'"));
+
+        // The first resource was applied; the second was where we aborted, so its POST never happened.
+        _mockServer.Resources.GetValueOrDefault("instances", []).Should().HaveCount(1);
+    }
+
     private ScalewayEnvironmentResource CreateEnvironment(string name)
     {
         var config = new ScalewayCredentialConfig
@@ -185,5 +268,24 @@ public sealed class ScalewayPipelineStepTests : IDisposable
 
     private static void NoOpSummary(string key, string value)
     {
+    }
+
+    /// <summary>
+    ///     Test approver that returns a pre-scripted sequence of decisions, one per call.
+    ///     Exhausting the script throws — tests should script as many decisions as resources.
+    /// </summary>
+    private sealed class ScriptedApprover(IReadOnlyList<DeployApproverDecision> decisions) : IDeployApprover
+    {
+        private int _index;
+
+        public Task<DeployApproverDecision> ApproveAsync(string resourceName, string resourceType, CancellationToken cancellationToken)
+        {
+            if (_index >= decisions.Count)
+            {
+                throw new InvalidOperationException($"ScriptedApprover ran out of decisions at resource '{resourceName}'.");
+            }
+
+            return Task.FromResult(decisions[_index++]);
+        }
     }
 }
