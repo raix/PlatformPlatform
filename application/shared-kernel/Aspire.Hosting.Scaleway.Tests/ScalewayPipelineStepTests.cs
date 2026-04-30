@@ -40,7 +40,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
         var rdb = CreateRdbResource("my-db", new ScalewayRdbPublishConfig());
 
         var act = async () => await ScalewayPipelineStep.RunAsync(
-            environment, [rdb], NullLogger.Instance, NoOpSummary, null, CancellationToken.None
+            environment, [rdb], NullLogger.Instance, NoOpSummary, ZeroCostEstimator, CancellationToken.None
         );
 
         await act.Should().ThrowAsync<DistributedApplicationException>()
@@ -58,7 +58,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
         var unrelated = new ScalewayRdbInstanceResource("local-only");
 
         await ScalewayPipelineStep.RunAsync(
-            environment, [unrelated], NullLogger.Instance, NoOpSummary, null, CancellationToken.None
+            environment, [unrelated], NullLogger.Instance, NoOpSummary, ZeroCostEstimator, CancellationToken.None
         );
 
         _mockServer.ReceivedRequests.Should().BeEmpty("no API calls should be made when there are no publish targets");
@@ -71,7 +71,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
         var rdb = CreateRdbResource("my-db", new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" });
 
         await ScalewayPipelineStep.RunAsync(
-            environment, [rdb], NullLogger.Instance, NoOpSummary, null, CancellationToken.None
+            environment, [rdb], NullLogger.Instance, NoOpSummary, ZeroCostEstimator, CancellationToken.None
         );
 
         _mockServer.ReceivedRequests.Where(r => r.Method == "POST").Should().NotBeEmpty("a clean plan should result in POST calls to provision resources");
@@ -87,7 +87,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
         await ScalewayPipelineStep.RunAsync(
             environment,
             [CreateRdbResource("my-db", new ScalewayRdbPublishConfig { Engine = "PostgreSQL-15", NodeType = "DB-DEV-S" })],
-            NullLogger.Instance, NoOpSummary, null, CancellationToken.None
+            NullLogger.Instance, NoOpSummary, ZeroCostEstimator, CancellationToken.None
         );
         var requestsBeforeBlockedAttempt = _mockServer.ReceivedRequests.Count(r => r.Method == "POST");
 
@@ -95,7 +95,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
         var conflictingRdb = CreateRdbResource("my-db", new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" });
 
         var act = async () => await ScalewayPipelineStep.RunAsync(
-            environment, [conflictingRdb], NullLogger.Instance, NoOpSummary, null, CancellationToken.None
+            environment, [conflictingRdb], NullLogger.Instance, NoOpSummary, ZeroCostEstimator, CancellationToken.None
         );
 
         await act.Should().ThrowAsync<DistributedApplicationException>()
@@ -129,6 +129,28 @@ public sealed class ScalewayPipelineStepTests : IDisposable
             .Where(ex => ex.Message.Contains("exceeds budget"));
 
         _mockServer.ReceivedRequests.Where(r => r.Method == "POST").Should().BeEmpty("no POSTs should be made when budget is exceeded");
+    }
+
+    [Fact]
+    public void FormatPlan_WithCostsButNoBudget_IncludesDiscoveryHint()
+    {
+        var environment = CreateEnvironment("production");
+        var changes = new[]
+        {
+            new DeploymentChange("my-db", DeploymentChangeType.Create, DeploymentChangeSeverity.Safe, "Create rdb 'my-db'")
+        };
+        var costs = new DeploymentCostSummary(
+            [new CostEstimate("my-db", "DB-DEV-S", 12m, "EUR", "DB-DEV-S")],
+            12m, "EUR"
+        );
+        var plan = new DeploymentPlan(changes, costs, null);
+
+        var output = ScalewayPipelineStep.FormatPlan(environment, plan);
+
+        output.Should().Contain("€12.00", "cost should always render even without a budget");
+        output.Should().Contain("WithMonthlyBudget", "the hint should mention the AppHost API");
+        output.Should().Contain("SCW_MONTHLY_BUDGET", "the hint should mention the env var");
+        output.Should().NotContain("within budget", "no budget verdict should appear without a budget");
     }
 
     [Fact]
@@ -267,6 +289,15 @@ public sealed class ScalewayPipelineStepTests : IDisposable
 
     private static void NoOpSummary(string key, string value)
     {
+    }
+
+    /// <summary>
+    ///     Cost estimator stand-in that returns zero — keeps unit tests deterministic and
+    ///     off the network. Tests that exercise budget/cost behaviour inject a specific summary.
+    /// </summary>
+    private static Task<DeploymentCostSummary> ZeroCostEstimator(IReadOnlyList<IResource> _, CancellationToken __)
+    {
+        return Task.FromResult(new DeploymentCostSummary([], 0m, "EUR"));
     }
 
     /// <summary>

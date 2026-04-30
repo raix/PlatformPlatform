@@ -54,14 +54,14 @@ internal static class ScalewayPipelineStep
 
         var changes = await ScalewayDeploymentStep.DryRunAsync(environment, publishResources, apiClient, cancellationToken);
 
-        DeploymentCostSummary? costSummary = null;
+        var costSummary = costEstimator is not null
+            ? await costEstimator(publishResources, cancellationToken)
+            : await EstimateWithDefaultClientAsync(publishResources, environment, cancellationToken);
+
         BudgetCheckResult? budgetCheck = null;
         var effectiveBudget = ResolveMonthlyBudget(environment);
         if (effectiveBudget is { } budget)
         {
-            costSummary = costEstimator is not null
-                ? await costEstimator(publishResources, cancellationToken)
-                : await EstimateWithDefaultClientAsync(publishResources, environment, cancellationToken);
             budgetCheck = new BudgetCheckResult(budget, costSummary.TotalMonthlyPrice, "EUR");
         }
 
@@ -173,6 +173,11 @@ internal static class ScalewayPipelineStep
         {
             sb.AppendLine();
             sb.AppendLine(budget.ExceedsBudget ? $"### 🚫 {budget.Message}" : $"### ✅ {budget.Message}");
+        }
+        else if (plan.CostSummary is not null)
+        {
+            sb.AppendLine();
+            sb.AppendLine("> 💡 Set a monthly cap with `WithMonthlyBudget(<eur>)` in AppHost or `SCW_MONTHLY_BUDGET=<eur>` to abort deploys above the cap.");
         }
 
         return sb.ToString().TrimEnd();
