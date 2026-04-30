@@ -256,6 +256,8 @@ This fetches `types.gen.ts` from `scaleway/scaleway-sdk-js` on GitHub, parses `C
 | `SCW_SECRET_KEY` | Scaleway API secret key |
 | `SCW_DEFAULT_PROJECT_ID` | Scaleway project ID |
 | `SCW_DEFAULT_REGION` | Default region (e.g., `fr-par`) |
+| `SCW_API_URL` | Scaleway API base URL. Defaults to `https://api.scaleway.com`. Override to point at a mock or proxy. Honored by both the provisioning client and the pricing client. |
+| `SCW_PRICING_CACHE_DISABLED` | Set to `1` to bypass the on-disk pricing cache. The cache lives at `~/.platformplatform/scaleway-pricing-cache-{region}.json` with a 24h TTL. |
 
 ### Application secrets (in Scaleway Secret Manager)
 

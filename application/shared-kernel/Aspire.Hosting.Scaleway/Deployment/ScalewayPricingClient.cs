@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace Aspire.Hosting.Scaleway.Deployment;
@@ -5,13 +6,21 @@ namespace Aspire.Hosting.Scaleway.Deployment;
 /// <summary>
 ///     Fetches pricing from the Scaleway Product Catalog API and estimates monthly costs for resources.
 ///     The Product Catalog is a public API (no authentication required).
+///     Catalog responses are cached on disk in <c>~/.platformplatform/scaleway-pricing-cache-{region}.json</c>
+///     with a 24h TTL so repeated dry-runs avoid the network round-trip. The cache can be disabled by
+///     setting <c>SCW_PRICING_CACHE_DISABLED=1</c>.
 /// </summary>
-public sealed class ScalewayPricingClient(HttpClient httpClient) : IDisposable
+public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDirectory = null, bool? cacheDisabled = null) : IDisposable
 {
-    private const string CatalogBaseUrl = "https://api.scaleway.com";
-    private Dictionary<string, CatalogProduct>? _catalogCache;
+    private const string DefaultCatalogBaseUrl = "https://api.scaleway.com";
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(24);
 
-    public ScalewayPricingClient() : this(new HttpClient { BaseAddress = new Uri(CatalogBaseUrl) })
+    private readonly string _cacheDirectory = cacheDirectory ?? DefaultCacheDirectory();
+    private readonly bool _cacheDisabled = cacheDisabled ?? Environment.GetEnvironmentVariable("SCW_PRICING_CACHE_DISABLED") == "1";
+
+    private readonly Dictionary<string, Dictionary<string, CatalogProduct>> _inMemoryCache = new(StringComparer.OrdinalIgnoreCase);
+
+    public ScalewayPricingClient() : this(new HttpClient { BaseAddress = new Uri(ResolveBaseUrl()) })
     {
     }
 
@@ -122,21 +131,54 @@ public sealed class ScalewayPricingClient(HttpClient httpClient) : IDisposable
 
     private async Task<Dictionary<string, CatalogProduct>> GetCatalogAsync(ScalewayRegion region, CancellationToken cancellationToken)
     {
-        if (_catalogCache is not null) return _catalogCache;
+        var regionKey = region.ToApiString();
 
-        var url = $"/product-catalog/v2alpha1/public-catalog/products?region={region.ToApiString()}&page_size=100";
-        var response = await httpClient.GetAsync(url, cancellationToken);
+        if (_inMemoryCache.TryGetValue(regionKey, out var cached))
+        {
+            return cached;
+        }
+
+        var fromDisk = _cacheDisabled ? null : TryReadDiskCache(regionKey);
+        if (fromDisk is not null)
+        {
+            _inMemoryCache[regionKey] = fromDisk;
+            return fromDisk;
+        }
+
+        var fetched = await FetchCatalogAsync(regionKey, cancellationToken);
+        _inMemoryCache[regionKey] = fetched;
+
+        if (!_cacheDisabled && fetched.Count > 0)
+        {
+            TryWriteDiskCache(regionKey, fetched);
+        }
+
+        return fetched;
+    }
+
+    private async Task<Dictionary<string, CatalogProduct>> FetchCatalogAsync(string regionKey, CancellationToken cancellationToken)
+    {
+        var url = $"/product-catalog/v2alpha1/public-catalog/products?region={regionKey}&page_size=100";
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.GetAsync(url, cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            // Fail-soft: return empty catalog so dry-run still produces a plan with €0 estimates.
+            return new Dictionary<string, CatalogProduct>(StringComparer.OrdinalIgnoreCase);
+        }
 
         if (!response.IsSuccessStatusCode)
         {
-            _catalogCache = new Dictionary<string, CatalogProduct>();
-            return _catalogCache;
+            return new Dictionary<string, CatalogProduct>(StringComparer.OrdinalIgnoreCase);
         }
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         using var doc = JsonDocument.Parse(json);
 
-        _catalogCache = new Dictionary<string, CatalogProduct>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, CatalogProduct>(StringComparer.OrdinalIgnoreCase);
 
         if (doc.RootElement.TryGetProperty("products", out var products))
         {
@@ -154,11 +196,102 @@ public sealed class ScalewayPricingClient(HttpClient httpClient) : IDisposable
                     hourlyPrice = units + nanos / 1_000_000_000m;
                 }
 
-                _catalogCache[variant] = new CatalogProduct(variant, hourlyPrice);
+                result[variant] = new CatalogProduct(variant, hourlyPrice);
             }
         }
 
-        return _catalogCache;
+        return result;
+    }
+
+    private Dictionary<string, CatalogProduct>? TryReadDiskCache(string regionKey)
+    {
+        var path = CacheFilePath(regionKey);
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            var json = File.ReadAllText(path);
+            using var doc = JsonDocument.Parse(json);
+
+            if (!doc.RootElement.TryGetProperty("updated_at", out var updatedAtProp) ||
+                !DateTimeOffset.TryParse(updatedAtProp.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var updatedAt))
+            {
+                return null;
+            }
+
+            if (DateTimeOffset.UtcNow - updatedAt > CacheTtl)
+            {
+                return null;
+            }
+
+            if (!doc.RootElement.TryGetProperty("products", out var products))
+            {
+                return null;
+            }
+
+            var result = new Dictionary<string, CatalogProduct>(StringComparer.OrdinalIgnoreCase);
+            foreach (var product in products.EnumerateObject())
+            {
+                if (decimal.TryParse(product.Value.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var price))
+                {
+                    result[product.Name] = new CatalogProduct(product.Name, price);
+                }
+            }
+
+            return result;
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            // Corrupt cache or permission problem: pretend it isn't there. The fetch path will refresh.
+            return null;
+        }
+    }
+
+    private void TryWriteDiskCache(string regionKey, Dictionary<string, CatalogProduct> catalog)
+    {
+        try
+        {
+            Directory.CreateDirectory(_cacheDirectory);
+
+            var products = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (variant, product) in catalog)
+            {
+                products[variant] = product.HourlyPrice.ToString(CultureInfo.InvariantCulture);
+            }
+
+            var payload = new
+            {
+                updated_at = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+                products
+            };
+
+            var path = CacheFilePath(regionKey);
+            var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
+            File.WriteAllText(tempPath, JsonSerializer.Serialize(payload));
+            File.Move(tempPath, path, true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Cache writes are best-effort — never fail a deploy because of disk problems.
+        }
+    }
+
+    private string CacheFilePath(string regionKey)
+    {
+        return Path.Combine(_cacheDirectory, $"scaleway-pricing-cache-{regionKey}.json");
+    }
+
+    private static string ResolveBaseUrl()
+    {
+        return Environment.GetEnvironmentVariable("SCW_API_URL") ?? DefaultCatalogBaseUrl;
+    }
+
+    private static string DefaultCacheDirectory()
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".platformplatform");
     }
 
     private static decimal FindPrice(Dictionary<string, CatalogProduct> catalog, string nodeType)
