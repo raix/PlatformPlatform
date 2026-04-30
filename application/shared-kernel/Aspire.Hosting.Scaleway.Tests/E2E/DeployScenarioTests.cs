@@ -1,4 +1,3 @@
-using Aspire.Hosting.Scaleway.Tests.MockServer;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests.E2E;

@@ -1,6 +1,6 @@
 using FluentAssertions;
 
-namespace Aspire.Hosting.Scaleway.Tests.MockServer;
+namespace Aspire.Hosting.Scaleway.Tests.E2E;
 
 public sealed class ScalewayDeploymentE2ETests : IDisposable
 {

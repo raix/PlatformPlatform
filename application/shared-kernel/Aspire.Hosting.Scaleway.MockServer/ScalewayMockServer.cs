@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
-namespace Aspire.Hosting.Scaleway.Tests.MockServer;
+namespace Aspire.Hosting.Scaleway.MockServer;
 
 /// <summary>
 ///     Lightweight mock HTTP server that simulates the Scaleway REST API.
@@ -18,10 +18,10 @@ public sealed class ScalewayMockServer : IDisposable
     private readonly ConcurrentDictionary<string, List<JsonElement>> _resources = new();
     private int _idCounter;
 
-    public ScalewayMockServer()
+    public ScalewayMockServer(int port = 0)
     {
         var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
         builder.Logging.ClearProviders();
         _app = builder.Build();
 

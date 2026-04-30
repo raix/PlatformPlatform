@@ -21,6 +21,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Aspire.Hosting.Scaleway\Aspire.Hosting.Scaleway.csproj"/>
+        <ProjectReference Include="..\Aspire.Hosting.Scaleway.MockServer\Aspire.Hosting.Scaleway.MockServer.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

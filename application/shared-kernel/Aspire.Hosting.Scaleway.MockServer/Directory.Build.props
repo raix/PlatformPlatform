@@ -1,0 +1,15 @@
+<Project>
+
+    <PropertyGroup>
+        <UseArtifactsOutput>true</UseArtifactsOutput>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Using Remove="JetBrains.Annotations"/>
+        <Using Remove="MediatR"/>
+        <Using Remove="System.ComponentModel"/>
+        <Using Remove="System.Reflection"/>
+        <Using Remove="System.Text.Json.Serialization"/>
+    </ItemGroup>
+
+</Project>

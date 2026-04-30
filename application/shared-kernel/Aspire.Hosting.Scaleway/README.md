@@ -288,7 +288,31 @@ For first-time rollouts and high-stakes changes, you can step through the deploy
 | `SCALEWAY_DEPLOY_INTERACTIVE=1` | Pause before each app-level resource and prompt `[a]pply / [s]kip / [q]uit`. Shared infrastructure (private network, registry namespace) is still auto-applied. The flag is ignored when stdin isn't a terminal — CI runs always fail fast. |
 | `SCW_MONTHLY_BUDGET=<eur>` | Override the AppHost's `WithMonthlyBudget(...)` value at deploy time. Useful for QA projects with a tight cap. |
 
-A typical QA loop:
+### Dry run against the local mock server first
+
+Before pointing at a real Scaleway project, exercise the prompt UX against the in-memory mock server. Boot it in one terminal:
+
+```bash
+pp scaleway-mock
+# Mock Scaleway API listening at: http://127.0.0.1:54321
+```
+
+Optional flags:
+- `--port <n>` to bind to a known port instead of OS-assigned.
+- `--seed <file.json>` to pre-populate state. Format is `{ "<resourceType>": [<resource>...] }`, e.g. `{"instances": [{"name": "postgres", "engine": "PostgreSQL-16", "node_type": "DB-DEV-S", "region": "fr-par"}]}`. Useful for simulating drift / blocked / no-op scenarios.
+
+Then in another terminal, point `aspire deploy` at the mock and walk it interactively:
+
+```bash
+export SCW_API_URL=http://127.0.0.1:54321
+export SCW_ACCESS_KEY=test SCW_SECRET_KEY=test SCW_DEFAULT_PROJECT_ID=test
+export SCALEWAY_DEPLOY_INTERACTIVE=1
+aspire deploy --apphost application/AppHost/AppHost.csproj
+```
+
+### Real Scaleway QA project
+
+Once the local prompt UX looks right, point at a real QA project:
 
 ```bash
 # Point at a dedicated QA Scaleway project

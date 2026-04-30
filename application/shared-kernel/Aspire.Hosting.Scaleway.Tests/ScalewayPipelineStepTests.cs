@@ -1,5 +1,4 @@
 using Aspire.Hosting.Pipelines;
-using Aspire.Hosting.Scaleway.Tests.MockServer;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
