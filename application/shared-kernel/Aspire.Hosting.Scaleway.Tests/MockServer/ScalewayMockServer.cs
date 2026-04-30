@@ -129,6 +129,21 @@ public sealed class ScalewayMockServer : IDisposable
         _app.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 
+    /// <summary>
+    ///     Pre-populates the mock with a resource so subsequent GETs return it.
+    ///     Use to simulate already-provisioned Scaleway state for E2E scenarios.
+    /// </summary>
+    public void Seed(string resourceType, object body)
+    {
+        var json = JsonDocument.Parse(JsonSerializer.Serialize(body)).RootElement;
+        _resources.AddOrUpdate(resourceType, _ => [json], (_, list) =>
+            {
+                list.Add(json);
+                return list;
+            }
+        );
+    }
+
     public void Start()
     {
         _app.StartAsync().GetAwaiter().GetResult();
@@ -136,24 +151,11 @@ public sealed class ScalewayMockServer : IDisposable
 
     private static string ExtractResourceType(string path)
     {
+        // Resource type is always the last path segment for the Scaleway list endpoints we handle
+        // (e.g. /rdb/v1/regions/{region}/instances). For GET-by-id (/.../instances/{id}) callers
+        // would need a different lookup, but our pipeline only uses list+create endpoints.
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        for (var i = segments.Length - 1; i >= 0; i--)
-        {
-            var segment = segments[i];
-            if (segment.StartsWith("fr-") || segment.StartsWith("nl-") || segment.StartsWith("pl-") ||
-                segment.StartsWith("v1") || segment.StartsWith("v2") ||
-                segment == "regions" || segment == "zones" ||
-                segment == "rdb" || segment == "redis" || segment == "vpc" ||
-                segment == "registry" || segment == "containers" ||
-                segment == "secret-manager")
-            {
-                continue;
-            }
-
-            return segment;
-        }
-
-        return "unknown";
+        return segments.Length > 0 ? segments[^1] : "unknown";
     }
 
     private static string? ExtractRegionOrZone(string path)

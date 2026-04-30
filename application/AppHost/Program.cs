@@ -7,8 +7,11 @@ using Aspire.Hosting.Scaleway.Provisioning;
 using Aspire.Hosting.Scaleway.Storage;
 using Projects;
 
-// Check for port conflicts before starting
-CheckPortAvailability();
+// Check for port conflicts before starting (skipped in publish/deploy and during E2E tests)
+if (Environment.GetEnvironmentVariable("APPHOST_SKIP_PORT_CHECK") != "1")
+{
+    CheckPortAvailability();
+}
 
 var builder = DistributedApplication.CreateBuilder(args);
 
