@@ -425,6 +425,9 @@ playwright-report/
 # PlatformPlatform agent workspace
 .workspace
 
+# Local task tracker (see .claude/reference/product-management/Todos.md)
+todos/
+
 # Generated Playwright combined config (created by pp e2e)
 application/playwright.combined.config.ts
 
