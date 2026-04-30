@@ -15,7 +15,12 @@ if (Environment.GetEnvironmentVariable("APPHOST_SKIP_PORT_CHECK") != "1")
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var certificatePassword = await builder.CreateSslCertificateIfNotExists();
+// In publish mode (aspire deploy / aspire publish) the dashboard never runs, so the dev HTTPS
+// certificate is not needed. Skipping its creation avoids a blocking keychain trust prompt on
+// fresh machines and CI runners.
+var certificatePassword = builder.ExecutionContext.IsPublishMode
+    ? string.Empty
+    : await builder.CreateSslCertificateIfNotExists();
 
 SecretManagerHelper.GenerateAuthenticationTokenSigningKey("authentication-token-signing-key");
 
