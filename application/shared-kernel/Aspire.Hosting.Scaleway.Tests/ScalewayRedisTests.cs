@@ -1,5 +1,3 @@
-using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;
@@ -70,10 +68,11 @@ public sealed class ScalewayRedisTests
         // Act
         builder.AddScalewayRedisCluster("my-cache")
             .RunAsRedisContainer(c =>
-            {
-                configured = true;
-                c.WithLifetime(ContainerLifetime.Persistent);
-            });
+                {
+                    configured = true;
+                    c.WithLifetime(ContainerLifetime.Persistent);
+                }
+            );
 
         // Assert
         configured.Should().BeTrue();

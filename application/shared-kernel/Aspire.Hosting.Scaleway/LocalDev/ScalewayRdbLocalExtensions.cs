@@ -1,12 +1,10 @@
-using Aspire.Hosting.Scaleway;
-
-namespace Aspire.Hosting;
+namespace Aspire.Hosting.Scaleway.LocalDev;
 
 public static class ScalewayRdbLocalExtensions
 {
     /// <summary>
-    /// Configures the Scaleway RDB instance to run as a local PostgreSQL container during development.
-    /// In publish mode, the resource remains a Scaleway cloud resource.
+    ///     Configures the Scaleway RDB instance to run as a local PostgreSQL container during development.
+    ///     In publish mode, the resource remains a Scaleway cloud resource.
     /// </summary>
     public static IResourceBuilder<ScalewayRdbInstanceResource> RunAsPostgresContainer(
         this IResourceBuilder<ScalewayRdbInstanceResource> builder,
@@ -29,8 +27,8 @@ public static class ScalewayRdbLocalExtensions
     }
 
     /// <summary>
-    /// Adds a named database to the Scaleway RDB instance.
-    /// In local dev (after RunAsPostgresContainer), creates the database on the inner PostgreSQL container.
+    ///     Adds a named database to the Scaleway RDB instance.
+    ///     In local dev (after RunAsPostgresContainer), creates the database on the inner PostgreSQL container.
     /// </summary>
     public static IResourceBuilder<PostgresDatabaseResource> AddDatabase(
         this IResourceBuilder<ScalewayRdbInstanceResource> builder,

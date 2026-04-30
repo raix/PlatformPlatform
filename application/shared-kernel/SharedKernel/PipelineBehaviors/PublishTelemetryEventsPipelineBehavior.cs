@@ -1,8 +1,12 @@
-using System.Diagnostics;
 using SharedKernel.Cqrs;
 using SharedKernel.Telemetry;
 
 namespace SharedKernel.PipelineBehaviors;
+
+internal static class TelemetryActivitySource
+{
+    public static readonly ActivitySource Instance = new("PlatformPlatform.TelemetryEvents");
+}
 
 public sealed class PublishTelemetryEventsPipelineBehavior<TRequest, TResponse>(
     ITelemetryEventsCollector telemetryEventsCollector,
@@ -10,8 +14,6 @@ public sealed class PublishTelemetryEventsPipelineBehavior<TRequest, TResponse>(
     ILogger<PublishTelemetryEventsPipelineBehavior<TRequest, TResponse>> logger
 ) : IPipelineBehavior<TRequest, TResponse> where TRequest : ICommand where TResponse : ResultBase
 {
-    private static readonly ActivitySource TelemetryActivitySource = new("PlatformPlatform.TelemetryEvents");
-
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         var response = await next(cancellationToken);
@@ -23,7 +25,7 @@ public sealed class PublishTelemetryEventsPipelineBehavior<TRequest, TResponse>(
                 var telemetryEvent = telemetryEventsCollector.Dequeue();
                 var eventName = telemetryEvent.GetType().Name;
 
-                using var activity = TelemetryActivitySource.StartActivity(eventName, ActivityKind.Internal);
+                using var activity = TelemetryActivitySource.Instance.StartActivity(eventName);
                 if (activity is not null)
                 {
                     foreach (var property in telemetryEvent.Properties)

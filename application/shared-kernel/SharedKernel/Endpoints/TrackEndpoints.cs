@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -27,7 +26,8 @@ public sealed class TrackEndpoints : IEndpoints
             {
                 case "PageviewData":
                 {
-                    using var activity = FrontendActivitySource.StartActivity("PageView", ActivityKind.Internal);
+                    // ReSharper disable once ExplicitCallerInfoArgument
+                    using var activity = FrontendActivitySource.StartActivity("PageView");
                     if (activity is not null)
                     {
                         activity.SetTag("page.name", trackRequest.Data.BaseData.Name);
@@ -43,7 +43,8 @@ public sealed class TrackEndpoints : IEndpoints
                 }
                 case "PageviewPerformanceData":
                 {
-                    using var activity = FrontendActivitySource.StartActivity("PageViewPerformance", ActivityKind.Internal);
+                    // ReSharper disable once ExplicitCallerInfoArgument
+                    using var activity = FrontendActivitySource.StartActivity("PageViewPerformance");
                     if (activity is not null)
                     {
                         activity.SetTag("page.name", trackRequest.Data.BaseData.Name);
@@ -64,7 +65,8 @@ public sealed class TrackEndpoints : IEndpoints
                 }
                 case "ExceptionData":
                 {
-                    using var activity = FrontendActivitySource.StartActivity("FrontendException", ActivityKind.Internal);
+                    // ReSharper disable once ExplicitCallerInfoArgument
+                    using var activity = FrontendActivitySource.StartActivity("FrontendException");
                     if (activity is not null)
                     {
                         activity.SetStatus(ActivityStatusCode.Error);
@@ -76,12 +78,13 @@ public sealed class TrackEndpoints : IEndpoints
                         foreach (var exception in trackRequest.Data.BaseData.Exceptions)
                         {
                             activity.AddEvent(new ActivityEvent("exception", tags: new ActivityTagsCollection
-                                {
-                                    { "exception.type", exception.TypeName },
-                                    { "exception.message", exception.Message },
-                                    { "exception.stacktrace", exception.Stack }
-                                }
-                            ));
+                                    {
+                                        { "exception.type", exception.TypeName },
+                                        { "exception.message", exception.Message },
+                                        { "exception.stacktrace", exception.Stack }
+                                    }
+                                )
+                            );
                         }
                     }
 

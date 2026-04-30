@@ -1,14 +1,10 @@
-using Aspire.Hosting.Scaleway;
-
-namespace Aspire.Hosting;
+namespace Aspire.Hosting.Scaleway;
 
 public static class ScalewayCredentialExtensions
 {
-    private const string CredentialConfigKey = "Aspire.Hosting.Scaleway.CredentialConfig";
-
     /// <summary>
-    /// Adds Scaleway credential configuration to the distributed application builder.
-    /// Reads from SCW_* environment variables and optional configuration overrides.
+    ///     Adds Scaleway credential configuration to the distributed application builder.
+    ///     Reads from SCW_* environment variables and optional configuration overrides.
     /// </summary>
     public static IResourceBuilder<ScalewayCredentialConfigResource> AddScalewayCredentialConfig(
         this IDistributedApplicationBuilder builder,
@@ -33,8 +29,8 @@ public static class ScalewayCredentialExtensions
     }
 
     /// <summary>
-    /// Injects Scaleway credential environment variables (SCW_ACCESS_KEY, SCW_SECRET_KEY, etc.)
-    /// into a project resource so it can authenticate with Scaleway APIs at runtime.
+    ///     Injects Scaleway credential environment variables (SCW_ACCESS_KEY, SCW_SECRET_KEY, etc.)
+    ///     into a project resource so it can authenticate with Scaleway APIs at runtime.
     /// </summary>
     public static IResourceBuilder<T> WithScalewayCredentials<T>(
         this IResourceBuilder<T> builder,

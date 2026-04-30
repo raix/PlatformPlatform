@@ -1,4 +1,3 @@
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;
@@ -25,9 +24,9 @@ public sealed class ScalewayCredentialTests
         var builder = DistributedApplication.CreateBuilder();
 
         var credentials = builder.AddScalewayCredentialConfig(
-            accessKey: "SCWXXXXXXXXXXXXXXXXXXX",
-            secretKey: "00000000-0000-0000-0000-000000000000",
-            defaultProjectId: "project-123"
+            "SCWXXXXXXXXXXXXXXXXXXX",
+            "00000000-0000-0000-0000-000000000000",
+            "project-123"
         );
 
         credentials.Resource.Name.Should().Be("scaleway-credentials");

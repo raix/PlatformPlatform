@@ -1,16 +1,16 @@
-namespace Aspire.Hosting.Scaleway;
+namespace Aspire.Hosting.Scaleway.Provisioning;
 
 /// <summary>
-/// Annotation that marks a resource for provisioning as a Scaleway Managed Database (RDB) instance.
+///     Annotation that marks a resource for provisioning as a Scaleway Managed Database (RDB) instance.
 /// </summary>
 public sealed class PublishAsScalewayRdbAnnotation : IScalewayPublishTargetAnnotation
 {
-    public ScalewayRdbPublishConfig Config { get; set; } = new();
+    public ScalewayRdbPublishConfig Config { get; init; } = new();
 }
 
 /// <summary>
-/// Configuration for publishing a Scaleway RDB instance.
-/// Platform teams can set these values per environment via appsettings or callbacks.
+///     Configuration for publishing a Scaleway RDB instance.
+///     Platform teams can set these values per environment via appsettings or callbacks.
 /// </summary>
 public sealed class ScalewayRdbPublishConfig
 {

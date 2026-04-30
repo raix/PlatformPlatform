@@ -1,27 +1,27 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
-namespace Aspire.Hosting.Scaleway;
+namespace Aspire.Hosting.Scaleway.Provisioning;
 
 /// <summary>
-/// Typed HTTP client for the Scaleway REST API.
-/// Handles authentication, region routing, and JSON serialization.
+///     Typed HTTP client for the Scaleway REST API.
+///     Handles authentication, region routing, and JSON serialization.
 /// </summary>
 public sealed class ScalewayApiClient : IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
     private readonly HttpClient _httpClient;
-    private readonly ScalewayCredentialConfig _credentials;
 
     public ScalewayApiClient(ScalewayCredentialConfig credentials)
     {
-        _credentials = credentials;
         _httpClient = new HttpClient { BaseAddress = new Uri(credentials.ApiUrl) };
         _httpClient.DefaultRequestHeaders.Add("X-Auth-Token", credentials.SecretKey);
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -29,12 +29,16 @@ public sealed class ScalewayApiClient : IDisposable
 
     internal ScalewayApiClient(HttpClient httpClient)
     {
-        _credentials = new ScalewayCredentialConfig();
         _httpClient = httpClient;
     }
 
+    public void Dispose()
+    {
+        _httpClient.Dispose();
+    }
+
     /// <summary>
-    /// Lists resources of a given type, optionally filtered by tags.
+    ///     Lists resources of a given type, optionally filtered by tags.
     /// </summary>
     public async Task<JsonElement[]> ListResourcesAsync(string apiPath, string region, Dictionary<string, string>? queryParams = null, CancellationToken cancellationToken = default)
     {
@@ -58,7 +62,7 @@ public sealed class ScalewayApiClient : IDisposable
     }
 
     /// <summary>
-    /// Creates a resource via POST.
+    ///     Creates a resource via POST.
     /// </summary>
     public async Task<JsonElement> CreateResourceAsync(string apiPath, string region, object body, CancellationToken cancellationToken = default)
     {
@@ -74,7 +78,7 @@ public sealed class ScalewayApiClient : IDisposable
     }
 
     /// <summary>
-    /// Updates a resource via PATCH.
+    ///     Updates a resource via PATCH.
     /// </summary>
     public async Task<JsonElement> UpdateResourceAsync(string apiPath, string region, string resourceId, object body, CancellationToken cancellationToken = default)
     {
@@ -91,14 +95,14 @@ public sealed class ScalewayApiClient : IDisposable
     }
 
     /// <summary>
-    /// Gets a single resource by ID.
+    ///     Gets a single resource by ID.
     /// </summary>
     public async Task<JsonElement?> GetResourceAsync(string apiPath, string region, string resourceId, CancellationToken cancellationToken = default)
     {
         var url = BuildUrl($"{apiPath}/{resourceId}", region);
         var response = await _httpClient.GetAsync(url, cancellationToken);
 
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
         }
@@ -111,7 +115,7 @@ public sealed class ScalewayApiClient : IDisposable
     }
 
     /// <summary>
-    /// Deletes a resource by ID.
+    ///     Deletes a resource by ID.
     /// </summary>
     public async Task DeleteResourceAsync(string apiPath, string region, string resourceId, CancellationToken cancellationToken = default)
     {
@@ -131,10 +135,5 @@ public sealed class ScalewayApiClient : IDisposable
         }
 
         return url;
-    }
-
-    public void Dispose()
-    {
-        _httpClient.Dispose();
     }
 }

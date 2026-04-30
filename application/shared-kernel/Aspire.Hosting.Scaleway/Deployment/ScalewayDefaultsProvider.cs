@@ -1,65 +1,43 @@
-namespace Aspire.Hosting.Scaleway;
+namespace Aspire.Hosting.Scaleway.Deployment;
 
 /// <summary>
-/// Provides lazy-initialized shared Scaleway infrastructure resources.
-/// Mirrors the CDKDefaultsProvider pattern from the AWS Aspire package.
-/// Each property creates the resource on first access and caches it.
+///     Provides lazy-initialized shared Scaleway infrastructure resources.
+///     Mirrors the CDKDefaultsProvider pattern from the AWS Aspire package.
+///     Each property creates the resource on first access and caches it.
 /// </summary>
-public sealed class ScalewayDefaultsProvider
+public sealed class ScalewayDefaultsProvider(ScalewayEnvironmentResource environment)
 {
-    private readonly ScalewayEnvironmentResource _environment;
+    public string ProjectId => environment.CredentialConfig.DefaultProjectId ?? string.Empty;
 
-    public ScalewayDefaultsProvider(ScalewayEnvironmentResource environment)
-    {
-        _environment = environment;
-    }
-
-    public string ProjectId => _environment.CredentialConfig.DefaultProjectId ?? string.Empty;
-
-    public ScalewayRegion Region => _environment.CredentialConfig.DefaultRegion;
+    public ScalewayRegion Region => environment.CredentialConfig.DefaultRegion;
 
     /// <summary>
-    /// Scaleway Private Network for isolating resources. All managed databases and containers
-    /// are attached to this network so they can communicate without public internet exposure.
+    ///     Scaleway Private Network for isolating resources. All managed databases and containers
+    ///     are attached to this network so they can communicate without public internet exposure.
     /// </summary>
-    public ScalewayPrivateNetworkConfig PrivateNetwork => _privateNetwork ??= CreateDefaultPrivateNetwork();
-    private ScalewayPrivateNetworkConfig? _privateNetwork;
+    public ScalewayPrivateNetworkConfig PrivateNetwork =>
+        field ??= new ScalewayPrivateNetworkConfig($"{environment.Name}-network", Region);
 
     /// <summary>
-    /// Container Registry namespace where built Docker images are pushed.
+    ///     Container Registry namespace where built Docker images are pushed.
     /// </summary>
-    public ScalewayRegistryConfig Registry => _registry ??= CreateDefaultRegistry();
-    private ScalewayRegistryConfig? _registry;
+    public ScalewayRegistryConfig Registry =>
+        field ??= new ScalewayRegistryConfig($"{environment.Name}-registry", Region);
 
     /// <summary>
-    /// Serverless Container namespace that groups all deployed containers.
+    ///     Serverless Container namespace that groups all deployed containers.
     /// </summary>
-    public ScalewayContainerNamespaceConfig ContainerNamespace => _containerNamespace ??= CreateDefaultContainerNamespace();
-    private ScalewayContainerNamespaceConfig? _containerNamespace;
-
-    private ScalewayPrivateNetworkConfig CreateDefaultPrivateNetwork()
-    {
-        return new ScalewayPrivateNetworkConfig($"{_environment.Name}-network", Region);
-    }
-
-    private ScalewayRegistryConfig CreateDefaultRegistry()
-    {
-        return new ScalewayRegistryConfig($"{_environment.Name}-registry", Region);
-    }
-
-    private ScalewayContainerNamespaceConfig CreateDefaultContainerNamespace()
-    {
-        return new ScalewayContainerNamespaceConfig($"{_environment.Name}-containers", Region);
-    }
+    public ScalewayContainerNamespaceConfig ContainerNamespace =>
+        field ??= new ScalewayContainerNamespaceConfig($"{environment.Name}-containers", Region);
 }
 
 /// <summary>
-/// Configuration for a Scaleway Private Network.
+///     Configuration for a Scaleway Private Network.
 /// </summary>
 public sealed record ScalewayPrivateNetworkConfig(string Name, ScalewayRegion Region);
 
 /// <summary>
-/// Configuration for a Scaleway Container Registry namespace.
+///     Configuration for a Scaleway Container Registry namespace.
 /// </summary>
 public sealed record ScalewayRegistryConfig(string Name, ScalewayRegion Region)
 {
@@ -67,6 +45,6 @@ public sealed record ScalewayRegistryConfig(string Name, ScalewayRegion Region)
 }
 
 /// <summary>
-/// Configuration for a Scaleway Serverless Container namespace.
+///     Configuration for a Scaleway Serverless Container namespace.
 /// </summary>
 public sealed record ScalewayContainerNamespaceConfig(string Name, ScalewayRegion Region);

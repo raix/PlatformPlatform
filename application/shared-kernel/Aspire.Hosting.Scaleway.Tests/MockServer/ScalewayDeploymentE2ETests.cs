@@ -1,9 +1,6 @@
-using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.Scaleway;
-using Aspire.Hosting.Scaleway.Tests.MockServer;
 using FluentAssertions;
 
-namespace Aspire.Hosting.Scaleway.Tests;
+namespace Aspire.Hosting.Scaleway.Tests.MockServer;
 
 public sealed class ScalewayDeploymentE2ETests : IDisposable
 {
@@ -14,6 +11,11 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
         _mockServer.Start();
     }
 
+    public void Dispose()
+    {
+        _mockServer.Dispose();
+    }
+
     [Fact]
     public async Task FullDeploy_ShouldCreateInfrastructureInCorrectOrder()
     {
@@ -22,15 +24,17 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
 
         var rdb = new ScalewayRdbInstanceResource("account-db");
         rdb.Annotations.Add(new PublishAsScalewayRdbAnnotation
-        {
-            Config = new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" }
-        });
+            {
+                Config = new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" }
+            }
+        );
 
         var redis = new ScalewayRedisClusterResource("session-cache");
         redis.Annotations.Add(new PublishAsScalewayRedisAnnotation
-        {
-            Config = new ScalewayRedisPublishConfig { Version = "7.0", NodeType = "RED1-MICRO" }
-        });
+            {
+                Config = new ScalewayRedisPublishConfig { Version = "7.0", NodeType = "RED1-MICRO" }
+            }
+        );
 
         // Act
         await ScalewayDeploymentStep.DeployAsync(environment, [rdb, redis], CancellationToken.None);
@@ -153,9 +157,10 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
 
         var rdb = new ScalewayRdbInstanceResource("my-db");
         rdb.Annotations.Add(new PublishAsScalewayRdbAnnotation
-        {
-            Config = new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S", Region = ScalewayRegion.FrPar }
-        });
+            {
+                Config = new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S", Region = ScalewayRegion.FrPar }
+            }
+        );
 
         // Deploy first
         await ScalewayDeploymentStep.DeployAsync(environment, [rdb], CancellationToken.None);
@@ -177,9 +182,10 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
 
         var container = new ScalewayRdbInstanceResource("my-api");
         container.Annotations.Add(new PublishAsScalewayContainerAnnotation
-        {
-            Config = new ScalewayContainerPublishConfig { MemoryLimitMb = 512, MinScale = 1, MaxScale = 5, Port = 8080 }
-        });
+            {
+                Config = new ScalewayContainerPublishConfig { MemoryLimitMb = 512, MinScale = 1, MaxScale = 5, Port = 8080 }
+            }
+        );
 
         // Act
         await ScalewayDeploymentStep.DeployAsync(environment, [container], CancellationToken.None);
@@ -190,7 +196,7 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
             .FirstOrDefault(r => r.Path.Contains("containers") && !r.Path.Contains("namespaces"));
 
         containerPost.Should().NotBeNull();
-        containerPost!.Body.Should().Contain("private_network_id");
+        containerPost.Body.Should().Contain("private_network_id");
         containerPost.Body.Should().Contain("512000000"); // memory in bytes
     }
 
@@ -204,11 +210,6 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
             DefaultRegion = ScalewayRegion.FrPar,
             ApiUrl = _mockServer.Url
         };
-        return new ScalewayEnvironmentResource(name, config, isPublishMode: true);
-    }
-
-    public void Dispose()
-    {
-        _mockServer.Dispose();
+        return new ScalewayEnvironmentResource(name, config, true);
     }
 }

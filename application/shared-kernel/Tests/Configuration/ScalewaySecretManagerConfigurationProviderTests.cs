@@ -9,13 +9,16 @@ namespace SharedKernel.Tests.Configuration;
 
 public sealed class ScalewaySecretManagerConfigurationProviderTests
 {
-    private static ScalewaySecretManagerOptions CreateOptions() => new()
+    private static ScalewaySecretManagerOptions CreateOptions()
     {
-        SecretKey = "test-secret-key",
-        ProjectId = "test-project-id",
-        Region = "fr-par",
-        ApiUrl = "https://api.scaleway.com"
-    };
+        return new ScalewaySecretManagerOptions
+        {
+            SecretKey = "test-secret-key",
+            ProjectId = "test-project-id",
+            Region = "fr-par",
+            ApiUrl = "https://api.scaleway.com"
+        };
+    }
 
     private static HttpClient CreateMockHttpClient(
         Func<HttpRequestMessage, HttpResponseMessage> handler)
@@ -29,27 +32,29 @@ public sealed class ScalewaySecretManagerConfigurationProviderTests
     {
         // Arrange
         var httpClient = CreateMockHttpClient(request =>
-        {
-            if (request.RequestUri!.PathAndQuery.Contains("/secrets?"))
             {
-                return CreateListSecretsResponse([
-                    ("secret-1", "database-password"),
-                    ("secret-2", "jwt-signing-key")
-                ]);
-            }
+                if (request.RequestUri!.PathAndQuery.Contains("/secrets?"))
+                {
+                    return CreateListSecretsResponse([
+                            ("secret-1", "database-password"),
+                            ("secret-2", "jwt-signing-key")
+                        ]
+                    );
+                }
 
-            if (request.RequestUri.PathAndQuery.Contains("secret-1/versions/latest_enabled/access"))
-            {
-                return CreateAccessSecretResponse("super-secret-password");
-            }
+                if (request.RequestUri.PathAndQuery.Contains("secret-1/versions/latest_enabled/access"))
+                {
+                    return CreateAccessSecretResponse("super-secret-password");
+                }
 
-            if (request.RequestUri.PathAndQuery.Contains("secret-2/versions/latest_enabled/access"))
-            {
-                return CreateAccessSecretResponse("base64-signing-key-value");
-            }
+                if (request.RequestUri.PathAndQuery.Contains("secret-2/versions/latest_enabled/access"))
+                {
+                    return CreateAccessSecretResponse("base64-signing-key-value");
+                }
 
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
-        });
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            }
+        );
 
         var provider = new ScalewaySecretManagerConfigurationProvider(CreateOptions(), httpClient);
 
@@ -104,27 +109,24 @@ public sealed class ScalewaySecretManagerConfigurationProviderTests
     {
         // Arrange
         var httpClient = CreateMockHttpClient(request =>
-        {
-            if (request.RequestUri!.PathAndQuery.Contains("/secrets?"))
             {
-                return CreateListSecretsResponse([
-                    ("secret-1", "good-secret"),
-                    ("secret-2", "bad-secret")
-                ]);
-            }
+                if (request.RequestUri!.PathAndQuery.Contains("/secrets?"))
+                {
+                    return CreateListSecretsResponse([
+                            ("secret-1", "good-secret"),
+                            ("secret-2", "bad-secret")
+                        ]
+                    );
+                }
 
-            if (request.RequestUri.PathAndQuery.Contains("secret-1/versions/latest_enabled/access"))
-            {
-                return CreateAccessSecretResponse("good-value");
-            }
+                if (request.RequestUri.PathAndQuery.Contains("secret-1/versions/latest_enabled/access"))
+                {
+                    return CreateAccessSecretResponse("good-value");
+                }
 
-            if (request.RequestUri.PathAndQuery.Contains("secret-2/versions/latest_enabled/access"))
-            {
                 return new HttpResponseMessage(HttpStatusCode.NotFound);
             }
-
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
-        });
+        );
 
         var provider = new ScalewaySecretManagerConfigurationProvider(CreateOptions(), httpClient);
 
@@ -144,13 +146,14 @@ public sealed class ScalewaySecretManagerConfigurationProviderTests
         // Arrange
         string? capturedAuthToken = null;
         var httpClient = CreateMockHttpClient(request =>
-        {
-            capturedAuthToken = request.Headers.TryGetValues("X-Auth-Token", out var values) ? values.First() : null;
-            return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("""{"secrets": [], "total_count": 0}""", Encoding.UTF8, "application/json")
-            };
-        });
+                capturedAuthToken = request.Headers.TryGetValues("X-Auth-Token", out var values) ? values.First() : null;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""{"secrets": [], "total_count": 0}""", Encoding.UTF8, "application/json")
+                };
+            }
+        );
 
         var options = CreateOptions();
         options.SecretKey = "my-auth-token";
@@ -169,13 +172,14 @@ public sealed class ScalewaySecretManagerConfigurationProviderTests
         // Arrange
         string? capturedUrl = null;
         var httpClient = CreateMockHttpClient(request =>
-        {
-            capturedUrl = request.RequestUri!.PathAndQuery;
-            return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("""{"secrets": [], "total_count": 0}""", Encoding.UTF8, "application/json")
-            };
-        });
+                capturedUrl = request.RequestUri!.PathAndQuery;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""{"secrets": [], "total_count": 0}""", Encoding.UTF8, "application/json")
+                };
+            }
+        );
 
         var options = CreateOptions();
         options.Tags = ["env:production", "app:platform"];
@@ -195,16 +199,18 @@ public sealed class ScalewaySecretManagerConfigurationProviderTests
         // Arrange
         string? capturedUrl = null;
         var httpClient = CreateMockHttpClient(request =>
-        {
-            if (request.RequestUri!.PathAndQuery.Contains("/secrets?"))
             {
-                capturedUrl = request.RequestUri.PathAndQuery;
+                if (request.RequestUri!.PathAndQuery.Contains("/secrets?"))
+                {
+                    capturedUrl = request.RequestUri.PathAndQuery;
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""{"secrets": [], "total_count": 0}""", Encoding.UTF8, "application/json")
+                };
             }
-            return new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent("""{"secrets": [], "total_count": 0}""", Encoding.UTF8, "application/json")
-            };
-        });
+        );
 
         var options = CreateOptions();
         options.Region = "nl-ams";

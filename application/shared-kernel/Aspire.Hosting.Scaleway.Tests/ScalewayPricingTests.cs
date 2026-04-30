@@ -1,8 +1,6 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;
@@ -14,8 +12,9 @@ public sealed class ScalewayPricingTests
     {
         // Arrange
         var httpClient = CreateMockCatalogClient([
-            CreateCatalogProduct("DB-DEV-S", 0.012m)
-        ]);
+                CreateCatalogProduct("DB-DEV-S", 0.012m)
+            ]
+        );
         using var pricing = new ScalewayPricingClient(httpClient);
         var config = new ScalewayRdbPublishConfig { NodeType = "DB-DEV-S" };
 
@@ -33,8 +32,9 @@ public sealed class ScalewayPricingTests
     {
         // Arrange
         var httpClient = CreateMockCatalogClient([
-            CreateCatalogProduct("DB-GP-S", 0.10m)
-        ]);
+                CreateCatalogProduct("DB-GP-S", 0.10m)
+            ]
+        );
         using var pricing = new ScalewayPricingClient(httpClient);
         var config = new ScalewayRdbPublishConfig { NodeType = "DB-GP-S", IsHaCluster = true };
 
@@ -51,8 +51,9 @@ public sealed class ScalewayPricingTests
     {
         // Arrange
         var httpClient = CreateMockCatalogClient([
-            CreateCatalogProduct("RED1-MICRO", 0.008m)
-        ]);
+                CreateCatalogProduct("RED1-MICRO", 0.008m)
+            ]
+        );
         using var pricing = new ScalewayPricingClient(httpClient);
         var config = new ScalewayRedisPublishConfig { NodeType = "RED1-MICRO", ClusterSize = 3 };
 
@@ -99,9 +100,10 @@ public sealed class ScalewayPricingTests
     {
         // Arrange
         var httpClient = CreateMockCatalogClient([
-            CreateCatalogProduct("DB-DEV-S", 0.012m),
-            CreateCatalogProduct("RED1-MICRO", 0.008m)
-        ]);
+                CreateCatalogProduct("DB-DEV-S", 0.012m),
+                CreateCatalogProduct("RED1-MICRO", 0.008m)
+            ]
+        );
         using var pricing = new ScalewayPricingClient(httpClient);
 
         var rdb = new ScalewayRdbInstanceResource("account-db");
@@ -172,10 +174,12 @@ public sealed class ScalewayPricingTests
         // Arrange
         var fetchCount = 0;
         var httpClient = new HttpClient(new CountingHandler(() =>
-        {
-            fetchCount++;
-            return CreateCatalogResponse([CreateCatalogProduct("DB-DEV-S", 0.012m)]);
-        })) { BaseAddress = new Uri("https://api.scaleway.com") };
+                {
+                    fetchCount++;
+                    return CreateCatalogResponse([CreateCatalogProduct("DB-DEV-S", 0.012m)]);
+                }
+            )
+        ) { BaseAddress = new Uri("https://api.scaleway.com") };
         using var pricing = new ScalewayPricingClient(httpClient);
         var config = new ScalewayRdbPublishConfig { NodeType = "DB-DEV-S" };
 
@@ -198,13 +202,14 @@ public sealed class ScalewayPricingTests
         var units = (long)Math.Floor(hourlyPrice);
         var nanos = (long)((hourlyPrice - units) * 1_000_000_000m);
         var json = JsonSerializer.Serialize(new
-        {
-            variant,
-            product = "test",
-            sku = variant,
-            price = new { retail_price = new { units, nanos, currency_code = "EUR" } },
-            unit_of_measure = new { unit = "hour", size = 1 }
-        });
+            {
+                variant,
+                product = "test",
+                sku = variant,
+                price = new { retail_price = new { units, nanos, currency_code = "EUR" } },
+                unit_of_measure = new { unit = "hour", size = 1 }
+            }
+        );
         return JsonDocument.Parse(json).RootElement.Clone();
     }
 

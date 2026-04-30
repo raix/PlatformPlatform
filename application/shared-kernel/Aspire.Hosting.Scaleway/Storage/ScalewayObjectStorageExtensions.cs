@@ -1,11 +1,9 @@
-using Aspire.Hosting.Scaleway;
-
-namespace Aspire.Hosting;
+namespace Aspire.Hosting.Scaleway.Storage;
 
 public static class ScalewayObjectStorageExtensions
 {
     /// <summary>
-    /// Adds Scaleway Object Storage (S3-compatible) to the application model.
+    ///     Adds Scaleway Object Storage (S3-compatible) to the application model.
     /// </summary>
     public static IResourceBuilder<ScalewayObjectStorageResource> AddScalewayObjectStorage(
         this IDistributedApplicationBuilder builder,
@@ -21,7 +19,7 @@ public static class ScalewayObjectStorageExtensions
     }
 
     /// <summary>
-    /// Adds a bucket to Scaleway Object Storage.
+    ///     Adds a bucket to Scaleway Object Storage.
     /// </summary>
     public static IResourceBuilder<ScalewayBucketResource> AddBucket(
         this IResourceBuilder<ScalewayObjectStorageResource> builder,
@@ -34,7 +32,7 @@ public static class ScalewayObjectStorageExtensions
     }
 
     /// <summary>
-    /// Sets the ACL (access control) for a bucket.
+    ///     Sets the ACL (access control) for a bucket.
     /// </summary>
     public static IResourceBuilder<ScalewayBucketResource> WithAcl(
         this IResourceBuilder<ScalewayBucketResource> builder,
@@ -45,7 +43,7 @@ public static class ScalewayObjectStorageExtensions
     }
 
     /// <summary>
-    /// Enables versioning on a bucket.
+    ///     Enables versioning on a bucket.
     /// </summary>
     public static IResourceBuilder<ScalewayBucketResource> WithVersioning(
         this IResourceBuilder<ScalewayBucketResource> builder)

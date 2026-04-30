@@ -1,4 +1,3 @@
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;

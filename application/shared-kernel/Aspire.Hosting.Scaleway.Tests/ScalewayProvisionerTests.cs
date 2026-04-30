@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;
@@ -14,16 +13,17 @@ public sealed class ScalewayProvisionerTests
         // Arrange
         var capturedRequests = new List<(string Method, string Url, string? Body)>();
         var httpClient = CreateMockHttpClient((method, url, body) =>
-        {
-            capturedRequests.Add((method, url, body));
-
-            if (method == "GET")
             {
-                return CreateListResponse("instances", []);
-            }
+                capturedRequests.Add((method, url, body));
 
-            return CreateResourceResponse("rdb-instance-123");
-        });
+                if (method == "GET")
+                {
+                    return CreateListResponse("instances", []);
+                }
+
+                return CreateResourceResponse("rdb-instance-123");
+            }
+        );
 
         var provisioner = new ScalewayProvisioner(httpClient, "my-app", "project-123");
         var config = new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" };
@@ -46,15 +46,16 @@ public sealed class ScalewayProvisionerTests
     public async Task ProvisionRdbInstance_WhenExistingResourceFound_ShouldReturnExisting()
     {
         // Arrange
-        var httpClient = CreateMockHttpClient((method, url, _) =>
-        {
-            if (method == "GET")
+        var httpClient = CreateMockHttpClient((method, _, _) =>
             {
-                return CreateListResponse("instances", [CreateResourceJson("existing-rdb-456")]);
-            }
+                if (method == "GET")
+                {
+                    return CreateListResponse("instances", [CreateResourceJson("existing-rdb-456")]);
+                }
 
-            throw new InvalidOperationException("Should not create when resource exists.");
-        });
+                throw new InvalidOperationException("Should not create when resource exists.");
+            }
+        );
 
         var provisioner = new ScalewayProvisioner(httpClient, "my-app", "project-123");
         var config = new ScalewayRdbPublishConfig();
@@ -72,16 +73,17 @@ public sealed class ScalewayProvisionerTests
         // Arrange
         var capturedRequests = new List<(string Method, string Url, string? Body)>();
         var httpClient = CreateMockHttpClient((method, url, body) =>
-        {
-            capturedRequests.Add((method, url, body));
-
-            if (method == "GET")
             {
-                return CreateListResponse("clusters", []);
-            }
+                capturedRequests.Add((method, url, body));
 
-            return CreateResourceResponse("redis-cluster-789");
-        });
+                if (method == "GET")
+                {
+                    return CreateListResponse("clusters", []);
+                }
+
+                return CreateResourceResponse("redis-cluster-789");
+            }
+        );
 
         var provisioner = new ScalewayProvisioner(httpClient, "my-app", "project-123");
         var config = new ScalewayRedisPublishConfig { Version = "7.0", NodeType = "RED1-MICRO", ClusterSize = 3 };
@@ -102,13 +104,15 @@ public sealed class ScalewayProvisionerTests
         // Arrange
         string? capturedBody = null;
         var httpClient = CreateMockHttpClient((method, _, body) =>
-        {
-            if (method == "POST")
             {
-                capturedBody = body;
+                if (method == "POST")
+                {
+                    capturedBody = body;
+                }
+
+                return method == "GET" ? CreateListResponse("instances", []) : CreateResourceResponse("new-id");
             }
-            return method == "GET" ? CreateListResponse("instances", []) : CreateResourceResponse("new-id");
-        });
+        );
 
         var provisioner = new ScalewayProvisioner(httpClient, "platform-platform", "project-123");
         var config = new ScalewayRdbPublishConfig();
@@ -146,10 +150,11 @@ public sealed class ScalewayProvisionerTests
         // Arrange
         var capturedUrls = new List<string>();
         var httpClient = CreateMockHttpClient((method, url, _) =>
-        {
-            capturedUrls.Add(url);
-            return method == "GET" ? CreateListResponse("instances", []) : CreateResourceResponse("new-id");
-        });
+            {
+                capturedUrls.Add(url);
+                return method == "GET" ? CreateListResponse("instances", []) : CreateResourceResponse("new-id");
+            }
+        );
 
         var provisioner = new ScalewayProvisioner(httpClient, "my-app", "project-123");
         var config = new ScalewayRdbPublishConfig { Region = ScalewayRegion.NlAms };

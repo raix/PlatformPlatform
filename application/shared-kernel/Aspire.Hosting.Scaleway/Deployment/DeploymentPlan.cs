@@ -1,13 +1,14 @@
-namespace Aspire.Hosting.Scaleway;
+namespace Aspire.Hosting.Scaleway.Deployment;
 
 /// <summary>
-/// Complete deployment plan combining infrastructure changes, cost estimates, and budget validation.
-/// Produced by the deployment planner for dry-run review before applying changes.
+///     Complete deployment plan combining infrastructure changes, cost estimates, and budget validation.
+///     Produced by the deployment planner for dry-run review before applying changes.
 /// </summary>
 public sealed record DeploymentPlan(
     IReadOnlyList<DeploymentChange> Changes,
     DeploymentCostSummary? CostSummary,
-    BudgetCheckResult? BudgetCheck)
+    BudgetCheckResult? BudgetCheck
+)
 {
     public bool HasBlockedChanges => Changes.Any(c => c.IsBlocked);
 

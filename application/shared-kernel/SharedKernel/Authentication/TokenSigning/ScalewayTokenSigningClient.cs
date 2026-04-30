@@ -1,12 +1,13 @@
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using Microsoft.IdentityModel.Tokens;
 
 namespace SharedKernel.Authentication.TokenSigning;
 
 /// <summary>
-/// Token signing client that reads the signing key, issuer, and audience from Scaleway Secret Manager.
-/// Mirrors the AzureTokenSigningClient pattern but uses Scaleway's REST API instead of Key Vault.
+///     Token signing client that reads the signing key, issuer, and audience from Scaleway Secret Manager.
+///     Mirrors the AzureTokenSigningClient pattern but uses Scaleway's REST API instead of Key Vault.
 /// </summary>
 public sealed class ScalewayTokenSigningClient : ITokenSigningClient
 {
@@ -62,7 +63,7 @@ public sealed class ScalewayTokenSigningClient : ITokenSigningClient
         var json = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
         using var doc = JsonDocument.Parse(json);
         var base64 = doc.RootElement.GetProperty("data").GetString()!;
-        return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+        return Encoding.UTF8.GetString(Convert.FromBase64String(base64));
     }
 
     private static HttpClient CreateDefaultHttpClient()

@@ -1,4 +1,3 @@
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;
@@ -22,7 +21,7 @@ public sealed class ScalewayStorageTests
     {
         var builder = DistributedApplication.CreateBuilder();
 
-        var storage = builder.AddScalewayObjectStorage("my-storage", region: ScalewayRegion.NlAms);
+        var storage = builder.AddScalewayObjectStorage("my-storage", ScalewayRegion.NlAms);
 
         storage.Resource.Region.Should().Be(ScalewayRegion.NlAms);
         storage.Resource.Endpoint.Should().Be("https://s3.nl-ams.scw.cloud");
@@ -49,7 +48,7 @@ public sealed class ScalewayStorageTests
         var builder = DistributedApplication.CreateBuilder();
         var storage = builder.AddScalewayObjectStorage("my-storage");
 
-        var bucket = storage.AddBucket("avatar-bucket", bucketName: "my-app-avatars");
+        var bucket = storage.AddBucket("avatar-bucket", "my-app-avatars");
 
         bucket.Resource.BucketName.Should().Be("my-app-avatars");
     }

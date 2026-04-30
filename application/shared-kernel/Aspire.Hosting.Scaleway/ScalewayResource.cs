@@ -1,7 +1,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Base resource for Scaleway services that do not expose a connection string or endpoints.
+///     Base resource for Scaleway services that do not expose a connection string or endpoints.
 /// </summary>
 public sealed class ScalewayResource(string name) : Resource(name), IScalewayResource
 {

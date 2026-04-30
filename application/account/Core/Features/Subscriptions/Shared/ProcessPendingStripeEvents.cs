@@ -3,7 +3,6 @@ using Account.Database;
 using Account.Features.Subscriptions.Domain;
 using Account.Features.Tenants.Domain;
 using Account.Integrations.Stripe;
-using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel.Telemetry;
 
@@ -25,6 +24,8 @@ public sealed class ProcessPendingStripeEvents(
     ILogger<ProcessPendingStripeEvents> logger
 )
 {
+    private static readonly ActivitySource TelemetryActivitySource = new("PlatformPlatform.TelemetryEvents");
+
     public async Task ExecuteAsync(StripeCustomerId stripeCustomerId, CancellationToken cancellationToken)
     {
         // Pessimistic lock serializes concurrent webhook processing for the same customer
@@ -266,8 +267,6 @@ public sealed class ProcessPendingStripeEvents(
         }
     }
 
-    private static readonly ActivitySource TelemetryActivitySource = new("PlatformPlatform.TelemetryEvents");
-
     private void SendTelemetryEvents(Tenant tenant, Subscription subscription)
     {
         TenantScopedTelemetryContext.Set(tenant.Id, subscription.Plan.ToString());
@@ -278,7 +277,7 @@ public sealed class ProcessPendingStripeEvents(
             var telemetryEvent = events.Dequeue();
             var eventName = telemetryEvent.GetType().Name;
 
-            using var activity = TelemetryActivitySource.StartActivity(eventName, ActivityKind.Internal);
+            using var activity = TelemetryActivitySource.StartActivity(eventName);
             if (activity is not null)
             {
                 foreach (var property in telemetryEvent.Properties)

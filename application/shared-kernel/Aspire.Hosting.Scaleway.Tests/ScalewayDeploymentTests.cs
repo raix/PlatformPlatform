@@ -1,4 +1,3 @@
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;
@@ -22,7 +21,7 @@ public sealed class ScalewayDeploymentTests
     {
         var builder = DistributedApplication.CreateBuilder();
 
-        var environment = builder.AddScalewayEnvironment("staging", region: ScalewayRegion.NlAms, projectId: "my-project");
+        var environment = builder.AddScalewayEnvironment("staging", ScalewayRegion.NlAms, "my-project");
 
         environment.Resource.CredentialConfig.DefaultRegion.Should().Be(ScalewayRegion.NlAms);
         environment.Resource.CredentialConfig.DefaultProjectId.Should().Be("my-project");
@@ -44,7 +43,7 @@ public sealed class ScalewayDeploymentTests
     public void DefaultsProvider_Registry_HasCorrectEndpoint()
     {
         var builder = DistributedApplication.CreateBuilder();
-        var environment = builder.AddScalewayEnvironment("production", region: ScalewayRegion.NlAms);
+        var environment = builder.AddScalewayEnvironment("production", ScalewayRegion.NlAms);
 
         var registry = environment.Resource.DefaultsProvider.Registry;
 

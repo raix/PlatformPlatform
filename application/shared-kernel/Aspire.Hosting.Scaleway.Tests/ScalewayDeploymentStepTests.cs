@@ -1,8 +1,6 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;
@@ -15,11 +13,12 @@ public sealed class ScalewayDeploymentStepTests
         // Arrange
         var createdResources = new List<string>();
         var apiClient = CreateMockApiClient((method, url, _) =>
-        {
-            if (method == "GET") return EmptyListResponse(url);
-            createdResources.Add(ExtractResourceType(url));
-            return ResourceResponse("new-id");
-        });
+            {
+                if (method == "GET") return EmptyListResponse(url);
+                createdResources.Add(ExtractResourceType(url));
+                return ResourceResponse("new-id");
+            }
+        );
 
         var environment = CreateEnvironment("production");
 
@@ -37,11 +36,12 @@ public sealed class ScalewayDeploymentStepTests
         // Arrange
         var postBodies = new List<string>();
         var apiClient = CreateMockApiClient((method, url, body) =>
-        {
-            if (method == "POST") postBodies.Add(body ?? "");
-            if (method == "GET") return EmptyListResponse(url);
-            return ResourceResponse("new-id");
-        });
+            {
+                if (method == "POST") postBodies.Add(body ?? "");
+                if (method == "GET") return EmptyListResponse(url);
+                return ResourceResponse("new-id");
+            }
+        );
 
         var environment = CreateEnvironment("staging");
         var rdb = new ScalewayRdbInstanceResource("my-db");
@@ -63,12 +63,13 @@ public sealed class ScalewayDeploymentStepTests
         // Arrange
         var postCount = 0;
         var apiClient = CreateMockApiClient((method, url, _) =>
-        {
-            if (method == "POST") postCount++;
-            if (method == "GET" && url.Contains("instances")) return ListResponse("instances", "existing-rdb", "my-db");
-            if (method == "GET") return EmptyListResponse(url);
-            return ResourceResponse("new-id");
-        });
+            {
+                if (method == "POST") postCount++;
+                if (method == "GET" && url.Contains("instances")) return ListResponse("instances", "existing-rdb", "my-db");
+                if (method == "GET") return EmptyListResponse(url);
+                return ResourceResponse("new-id");
+            }
+        );
 
         var environment = CreateEnvironment("staging");
         var rdb = new ScalewayRdbInstanceResource("my-db");
@@ -86,13 +87,18 @@ public sealed class ScalewayDeploymentStepTests
     {
         // Arrange
         var apiClient = CreateMockApiClient((method, _, _) =>
-        {
-            if (method == "GET") return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("""{"items": [], "total_count": 0, "private_networks": [], "namespaces": [], "instances": [], "clusters": [], "containers": []}""", Encoding.UTF8, "application/json")
-            };
-            return ResourceResponse("new-id");
-        });
+                if (method == "GET")
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("""{"items": [], "total_count": 0, "private_networks": [], "namespaces": [], "instances": [], "clusters": [], "containers": []}""", Encoding.UTF8, "application/json")
+                    };
+                }
+
+                return ResourceResponse("new-id");
+            }
+        );
 
         var environment = CreateEnvironment("staging");
         var rdb = new ScalewayRdbInstanceResource("my-db");
@@ -116,12 +122,13 @@ public sealed class ScalewayDeploymentStepTests
     {
         // Arrange
         var apiClient = CreateMockApiClient((_, url, _) =>
-        {
-            if (url.Contains("private-networks")) return ListResponse("private_networks", "net-1", "staging-network");
-            if (url.Contains("registry")) return ListResponse("namespaces", "reg-1", "staging-registry");
-            if (url.Contains("rdb") && url.Contains("instances")) return RdbInstanceResponse("rdb-1", "fr-par", "PostgreSQL-16", "DB-DEV-S", false);
-            return EmptyListResponse(url);
-        });
+            {
+                if (url.Contains("private-networks")) return ListResponse("private_networks", "net-1", "staging-network");
+                if (url.Contains("registry")) return ListResponse("namespaces", "reg-1", "staging-registry");
+                if (url.Contains("rdb") && url.Contains("instances")) return RdbInstanceResponse("rdb-1", "fr-par", "PostgreSQL-16", "DB-DEV-S", false);
+                return EmptyListResponse(url);
+            }
+        );
 
         var environment = CreateEnvironment("staging");
         var rdb = new ScalewayRdbInstanceResource("my-db");
@@ -140,12 +147,13 @@ public sealed class ScalewayDeploymentStepTests
     {
         // Arrange
         var apiClient = CreateMockApiClient((_, url, _) =>
-        {
-            if (url.Contains("private-networks")) return ListResponse("private_networks", "net-1", "staging-network");
-            if (url.Contains("registry")) return ListResponse("namespaces", "reg-1", "staging-registry");
-            if (url.Contains("rdb") && url.Contains("instances")) return RdbInstanceResponse("rdb-1", "fr-par", "PostgreSQL-16", "DB-DEV-S", false);
-            return EmptyListResponse(url);
-        });
+            {
+                if (url.Contains("private-networks")) return ListResponse("private_networks", "net-1", "staging-network");
+                if (url.Contains("registry")) return ListResponse("namespaces", "reg-1", "staging-registry");
+                if (url.Contains("rdb") && url.Contains("instances")) return RdbInstanceResponse("rdb-1", "fr-par", "PostgreSQL-16", "DB-DEV-S", false);
+                return EmptyListResponse(url);
+            }
+        );
 
         var environment = CreateEnvironment("staging");
         var rdb = new ScalewayRdbInstanceResource("my-db");
@@ -164,10 +172,11 @@ public sealed class ScalewayDeploymentStepTests
         // Arrange
         var postCount = 0;
         var apiClient = CreateMockApiClient((method, _, _) =>
-        {
-            if (method == "POST") postCount++;
-            return EmptyListResponse("");
-        });
+            {
+                if (method == "POST") postCount++;
+                return EmptyListResponse("");
+            }
+        );
 
         var environment = CreateEnvironment("staging");
         var rdb = new ScalewayRdbInstanceResource("my-db");
@@ -188,7 +197,7 @@ public sealed class ScalewayDeploymentStepTests
             DefaultProjectId = "test-project",
             DefaultRegion = ScalewayRegion.FrPar
         };
-        return new ScalewayEnvironmentResource(name, config, isPublishMode: true);
+        return new ScalewayEnvironmentResource(name, config, true);
     }
 
     private static ScalewayApiClient CreateMockApiClient(Func<string, string, string?, HttpResponseMessage> handler)

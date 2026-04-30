@@ -1,10 +1,11 @@
+using System.Net;
 using Amazon.S3;
 using Amazon.S3.Model;
 
 namespace SharedKernel.Integrations.BlobStorage;
 
 /// <summary>
-/// S3-compatible blob storage client. Works with Scaleway Object Storage, SeaweedFS, MinIO, and AWS S3.
+///     S3-compatible blob storage client. Works with Scaleway Object Storage, SeaweedFS, MinIO, and AWS S3.
 /// </summary>
 public sealed class S3BlobStorageClient(IAmazonS3 s3Client, string endpoint, TimeProvider timeProvider) : IBlobStorageClient
 {
@@ -28,7 +29,7 @@ public sealed class S3BlobStorageClient(IAmazonS3 s3Client, string endpoint, Tim
             var response = await s3Client.GetObjectAsync(containerName, blobName, cancellationToken);
             return (response.ResponseStream, response.Headers.ContentType);
         }
-        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (AmazonS3Exception ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
         }
@@ -46,7 +47,7 @@ public sealed class S3BlobStorageClient(IAmazonS3 s3Client, string endpoint, Tim
             await s3Client.DeleteObjectAsync(containerName, blobName, cancellationToken);
             return true;
         }
-        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (AmazonS3Exception ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
             return false;
         }
@@ -56,12 +57,13 @@ public sealed class S3BlobStorageClient(IAmazonS3 s3Client, string endpoint, Tim
     {
         var expiresOn = timeProvider.GetUtcNow().Add(expiresIn);
         var presignedUrl = s3Client.GetPreSignedURL(new GetPreSignedUrlRequest
-        {
-            BucketName = container,
-            Expires = expiresOn.UtcDateTime,
-            Verb = HttpVerb.GET,
-            Protocol = Protocol.HTTPS
-        });
+            {
+                BucketName = container,
+                Expires = expiresOn.UtcDateTime,
+                Verb = HttpVerb.GET,
+                Protocol = Protocol.HTTPS
+            }
+        );
 
         // Return just the query string portion
         var uri = new Uri(presignedUrl);
@@ -72,13 +74,14 @@ public sealed class S3BlobStorageClient(IAmazonS3 s3Client, string endpoint, Tim
     {
         var expiresOn = timeProvider.GetUtcNow().Add(expiresIn);
         var presignedUrl = s3Client.GetPreSignedURL(new GetPreSignedUrlRequest
-        {
-            BucketName = container,
-            Key = blobName,
-            Expires = expiresOn.UtcDateTime,
-            Verb = HttpVerb.GET,
-            Protocol = Protocol.HTTPS
-        });
+            {
+                BucketName = container,
+                Key = blobName,
+                Expires = expiresOn.UtcDateTime,
+                Verb = HttpVerb.GET,
+                Protocol = Protocol.HTTPS
+            }
+        );
 
         return new Uri(presignedUrl);
     }

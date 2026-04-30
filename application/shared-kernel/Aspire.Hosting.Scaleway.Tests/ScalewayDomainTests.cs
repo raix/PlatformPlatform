@@ -1,4 +1,3 @@
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;
@@ -15,7 +14,7 @@ public sealed class ScalewayDomainTests
 
         var annotation = container.Resource.Annotations.OfType<ScalewayCustomDomainAnnotation>().SingleOrDefault();
         annotation.Should().NotBeNull();
-        annotation!.Domain.Should().Be("app.example.com");
+        annotation.Domain.Should().Be("app.example.com");
         annotation.Region.Should().Be(ScalewayRegion.FrPar);
     }
 
@@ -25,7 +24,7 @@ public sealed class ScalewayDomainTests
         var builder = DistributedApplication.CreateBuilder();
         var container = builder.AddContainer("my-api", "my-image");
 
-        container.WithCustomDomain("app.example.com", region: ScalewayRegion.NlAms);
+        container.WithCustomDomain("app.example.com", ScalewayRegion.NlAms);
 
         var annotation = container.Resource.Annotations.OfType<ScalewayCustomDomainAnnotation>().Single();
         annotation.Region.Should().Be(ScalewayRegion.NlAms);

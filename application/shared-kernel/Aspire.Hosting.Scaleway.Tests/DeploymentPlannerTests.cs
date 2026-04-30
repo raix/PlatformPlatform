@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;
@@ -53,9 +52,10 @@ public sealed class DeploymentPlannerTests
     public void PlanUpdate_WhenImmutableFieldChanges_ShouldBeBlocked()
     {
         var changes = _planner.PlanUpdate("my-db", "rdb", new Dictionary<string, (string?, string?)>
-        {
-            ["region"] = ("fr-par", "nl-ams")
-        });
+            {
+                ["region"] = ("fr-par", "nl-ams")
+            }
+        );
 
         changes.Should().HaveCount(1);
         changes[0].Severity.Should().Be(DeploymentChangeSeverity.Blocked);
@@ -67,9 +67,10 @@ public sealed class DeploymentPlannerTests
     public void PlanUpdate_WhenEngineChanges_ShouldBeBlocked()
     {
         var changes = _planner.PlanUpdate("my-db", "rdb", new Dictionary<string, (string?, string?)>
-        {
-            ["engine"] = ("PostgreSQL-15", "PostgreSQL-16")
-        });
+            {
+                ["engine"] = ("PostgreSQL-15", "PostgreSQL-16")
+            }
+        );
 
         changes.Should().HaveCount(1);
         changes[0].Severity.Should().Be(DeploymentChangeSeverity.Blocked);
@@ -79,9 +80,10 @@ public sealed class DeploymentPlannerTests
     public void PlanUpdate_WhenNodeTypeChanges_ShouldWarn()
     {
         var changes = _planner.PlanUpdate("my-db", "rdb", new Dictionary<string, (string?, string?)>
-        {
-            ["node_type"] = ("DB-DEV-S", "DB-GP-S")
-        });
+            {
+                ["node_type"] = ("DB-DEV-S", "DB-GP-S")
+            }
+        );
 
         changes.Should().HaveCount(1);
         changes[0].Severity.Should().Be(DeploymentChangeSeverity.Warning);
@@ -93,9 +95,10 @@ public sealed class DeploymentPlannerTests
     public void PlanUpdate_WhenSafeFieldChanges_ShouldBeSafe()
     {
         var changes = _planner.PlanUpdate("my-db", "rdb", new Dictionary<string, (string?, string?)>
-        {
-            ["tags"] = ("old-tag", "new-tag")
-        });
+            {
+                ["tags"] = ("old-tag", "new-tag")
+            }
+        );
 
         changes.Should().HaveCount(1);
         changes[0].Severity.Should().Be(DeploymentChangeSeverity.Safe);
@@ -105,10 +108,11 @@ public sealed class DeploymentPlannerTests
     public void PlanUpdate_WhenNoChanges_ShouldReturnEmpty()
     {
         var changes = _planner.PlanUpdate("my-db", "rdb", new Dictionary<string, (string?, string?)>
-        {
-            ["region"] = ("fr-par", "fr-par"),
-            ["engine"] = ("PostgreSQL-16", "PostgreSQL-16")
-        });
+            {
+                ["region"] = ("fr-par", "fr-par"),
+                ["engine"] = ("PostgreSQL-16", "PostgreSQL-16")
+            }
+        );
 
         changes.Should().BeEmpty();
     }
@@ -117,11 +121,12 @@ public sealed class DeploymentPlannerTests
     public void PlanUpdate_WhenMultipleChanges_ShouldReturnAll()
     {
         var changes = _planner.PlanUpdate("my-db", "rdb", new Dictionary<string, (string?, string?)>
-        {
-            ["region"] = ("fr-par", "nl-ams"),
-            ["node_type"] = ("DB-DEV-S", "DB-GP-S"),
-            ["tags"] = ("v1", "v2")
-        });
+            {
+                ["region"] = ("fr-par", "nl-ams"),
+                ["node_type"] = ("DB-DEV-S", "DB-GP-S"),
+                ["tags"] = ("v1", "v2")
+            }
+        );
 
         changes.Should().HaveCount(3);
         changes.Count(c => c.Severity == DeploymentChangeSeverity.Blocked).Should().Be(1);
@@ -133,14 +138,15 @@ public sealed class DeploymentPlannerTests
     public void PlanRdbUpdate_ShouldCompareAgainstApiResponse()
     {
         var existing = JsonDocument.Parse("""
-        {
-            "id": "rdb-123",
-            "region": "fr-par",
-            "engine": "PostgreSQL-16",
-            "node_type": "DB-DEV-S",
-            "is_ha_cluster": false
-        }
-        """).RootElement;
+                                          {
+                                              "id": "rdb-123",
+                                              "region": "fr-par",
+                                              "engine": "PostgreSQL-16",
+                                              "node_type": "DB-DEV-S",
+                                              "is_ha_cluster": false
+                                          }
+                                          """
+        ).RootElement;
 
         var desired = new ScalewayRdbPublishConfig
         {

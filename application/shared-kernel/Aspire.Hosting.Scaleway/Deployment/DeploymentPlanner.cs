@@ -1,17 +1,17 @@
 using System.Text.Json;
 
-namespace Aspire.Hosting.Scaleway;
+namespace Aspire.Hosting.Scaleway.Deployment;
 
 /// <summary>
-/// Compares desired resource state (from AppHost) against actual state (from Scaleway API)
-/// and produces a list of changes with safety classifications.
-/// Blocks dangerous changes (data loss) and flags warnings (potential downtime).
+///     Compares desired resource state (from AppHost) against actual state (from Scaleway API)
+///     and produces a list of changes with safety classifications.
+///     Blocks dangerous changes (data loss) and flags warnings (potential downtime).
 /// </summary>
 public sealed class DeploymentPlanner
 {
     /// <summary>
-    /// Fields that cannot be changed without recreating the resource (causes data loss).
-    /// Changing these is always blocked.
+    ///     Fields that cannot be changed without recreating the resource (causes data loss).
+    ///     Changing these is always blocked.
     /// </summary>
     private static readonly Dictionary<string, HashSet<string>> ImmutableFields = new()
     {
@@ -21,8 +21,8 @@ public sealed class DeploymentPlanner
     };
 
     /// <summary>
-    /// Fields that can be changed but may cause downtime.
-    /// These produce warnings but are not blocked.
+    ///     Fields that can be changed but may cause downtime.
+    ///     These produce warnings but are not blocked.
     /// </summary>
     private static readonly Dictionary<string, HashSet<string>> WarningFields = new()
     {
@@ -31,17 +31,20 @@ public sealed class DeploymentPlanner
     };
 
     /// <summary>
-    /// Default deletion policies per resource type.
-    /// Data-bearing resources default to Retain.
+    ///     Default deletion policies per resource type.
+    ///     Data-bearing resources default to Retain.
     /// </summary>
-    public static DeletionPolicy GetDefaultDeletionPolicy(string resourceType) => resourceType switch
+    public static DeletionPolicy GetDefaultDeletionPolicy(string resourceType)
     {
-        "rdb" => DeletionPolicy.Retain,
-        "redis" => DeletionPolicy.Retain,
-        "object-storage" => DeletionPolicy.Retain,
-        "secret" => DeletionPolicy.Retain,
-        _ => DeletionPolicy.Delete
-    };
+        return resourceType switch
+        {
+            "rdb" => DeletionPolicy.Retain,
+            "redis" => DeletionPolicy.Retain,
+            "object-storage" => DeletionPolicy.Retain,
+            "secret" => DeletionPolicy.Retain,
+            _ => DeletionPolicy.Delete
+        };
+    }
 
     public DeploymentChange PlanCreate(string resourceName, string resourceType)
     {
@@ -100,7 +103,7 @@ public sealed class DeploymentPlanner
     }
 
     /// <summary>
-    /// Compares a desired RDB config against an existing Scaleway RDB instance and returns planned changes.
+    ///     Compares a desired RDB config against an existing Scaleway RDB instance and returns planned changes.
     /// </summary>
     public List<DeploymentChange> PlanRdbUpdate(string resourceName, ScalewayRdbPublishConfig desired, JsonElement existing)
     {
@@ -115,7 +118,7 @@ public sealed class DeploymentPlanner
     }
 
     /// <summary>
-    /// Compares a desired Redis config against an existing Scaleway Redis cluster and returns planned changes.
+    ///     Compares a desired Redis config against an existing Scaleway Redis cluster and returns planned changes.
     /// </summary>
     public List<DeploymentChange> PlanRedisUpdate(string resourceName, ScalewayRedisPublishConfig desired, JsonElement existing)
     {

@@ -1,7 +1,7 @@
 namespace Aspire.Hosting.Scaleway;
 
 /// <summary>
-/// Marker interface for all Scaleway cloud resources.
+///     Marker interface for all Scaleway cloud resources.
 /// </summary>
 public interface IScalewayResource : IResource
 {

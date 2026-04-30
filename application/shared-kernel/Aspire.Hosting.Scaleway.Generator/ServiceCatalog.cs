@@ -1,7 +1,7 @@
 namespace Aspire.Hosting.Scaleway.Generator;
 
 /// <summary>
-/// Maps Scaleway service names to categories and tracks per-service configuration.
+///     Maps Scaleway service names to categories and tracks per-service configuration.
 /// </summary>
 public static class ServiceCatalog
 {
@@ -72,7 +72,7 @@ public static class ServiceCatalog
     };
 
     /// <summary>
-    /// Services that use zones instead of regions.
+    ///     Services that use zones instead of regions.
     /// </summary>
     private static readonly HashSet<string> ZonalServices =
     [
@@ -80,8 +80,8 @@ public static class ServiceCatalog
     ];
 
     /// <summary>
-    /// Override the PascalCase service prefix used in generated type names.
-    /// Prevents collisions like ScalewayContainerContainerResource.
+    ///     Override the PascalCase service prefix used in generated type names.
+    ///     Prevents collisions like ScalewayContainerContainerResource.
     /// </summary>
     private static readonly Dictionary<string, string> ServiceNameOverrides = new()
     {
@@ -91,15 +91,25 @@ public static class ServiceCatalog
         ["domain"] = "Dns"
     };
 
-    public static bool IsSkipped(string serviceName) => SkippedServices.Contains(serviceName);
-
-    public static string GetCategory(string serviceName) =>
-        ServiceToCategory.GetValueOrDefault(serviceName, "Other");
-
-    public static bool IsZonal(string serviceName) => ZonalServices.Contains(serviceName);
-
-    public static string GetServicePrefix(string serviceName) =>
-        ServiceNameOverrides.GetValueOrDefault(serviceName, CSharpEmitter.ToPascalCase(serviceName));
-
     public static IReadOnlyCollection<string> AllServices => ServiceToCategory.Keys;
+
+    public static bool IsSkipped(string serviceName)
+    {
+        return SkippedServices.Contains(serviceName);
+    }
+
+    public static string GetCategory(string serviceName)
+    {
+        return ServiceToCategory.GetValueOrDefault(serviceName, "Other");
+    }
+
+    public static bool IsZonal(string serviceName)
+    {
+        return ZonalServices.Contains(serviceName);
+    }
+
+    public static string GetServicePrefix(string serviceName)
+    {
+        return ServiceNameOverrides.GetValueOrDefault(serviceName, CSharpEmitter.ToPascalCase(serviceName));
+    }
 }

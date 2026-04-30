@@ -1,12 +1,10 @@
-using Aspire.Hosting.Scaleway;
-
-namespace Aspire.Hosting;
+namespace Aspire.Hosting.Scaleway.Provisioning;
 
 public static class ScalewayPublishExtensions
 {
     /// <summary>
-    /// Configures a Scaleway RDB instance resource for cloud deployment.
-    /// The callback allows platform teams to customize engine, node type, HA, and other settings per environment.
+    ///     Configures a Scaleway RDB instance resource for cloud deployment.
+    ///     The callback allows platform teams to customize engine, node type, HA, and other settings per environment.
     /// </summary>
     public static IResourceBuilder<ScalewayRdbInstanceResource> PublishAsScalewayRdb(
         this IResourceBuilder<ScalewayRdbInstanceResource> builder,
@@ -19,7 +17,7 @@ public static class ScalewayPublishExtensions
     }
 
     /// <summary>
-    /// Configures a Scaleway Redis cluster resource for cloud deployment.
+    ///     Configures a Scaleway Redis cluster resource for cloud deployment.
     /// </summary>
     public static IResourceBuilder<ScalewayRedisClusterResource> PublishAsScalewayRedis(
         this IResourceBuilder<ScalewayRedisClusterResource> builder,
@@ -32,7 +30,7 @@ public static class ScalewayPublishExtensions
     }
 
     /// <summary>
-    /// Configures a .NET project for deployment as a Scaleway Serverless Container.
+    ///     Configures a .NET project for deployment as a Scaleway Serverless Container.
     /// </summary>
     public static IResourceBuilder<ProjectResource> PublishAsScalewayContainer(
         this IResourceBuilder<ProjectResource> builder,
@@ -45,7 +43,7 @@ public static class ScalewayPublishExtensions
     }
 
     /// <summary>
-    /// Configures Scaleway Object Storage for cloud deployment.
+    ///     Configures Scaleway Object Storage for cloud deployment.
     /// </summary>
     public static IResourceBuilder<ScalewayObjectStorageResource> PublishAsScalewayObjectStorage(
         this IResourceBuilder<ScalewayObjectStorageResource> builder,

@@ -66,7 +66,7 @@ static string GetOutputDirectory(string[] args)
     var generatorDir = AppContext.BaseDirectory;
     // Navigate up to find the project root (handles bin/Debug/net10.0 structure)
     var projectDir = FindProjectDirectory(generatorDir)
-        ?? throw new InvalidOperationException("Could not find project directory.");
+                     ?? throw new InvalidOperationException("Could not find project directory.");
     return Path.GetFullPath(Path.Combine(projectDir, "..", "Aspire.Hosting.Scaleway", "Generated"));
 }
 
@@ -79,8 +79,10 @@ static string? FindProjectDirectory(string startDir)
         {
             return dir;
         }
+
         dir = Path.GetDirectoryName(dir);
     }
+
     return null;
 }
 

@@ -1,18 +1,18 @@
 using System.Text.Json;
 
-namespace Aspire.Hosting.Scaleway;
+namespace Aspire.Hosting.Scaleway.Provisioning;
 
 /// <summary>
-/// Provisions Scaleway cloud resources by calling the Scaleway REST API directly.
-/// Uses tag-based find-or-create for idempotent deployments (no external state files).
+///     Provisions Scaleway cloud resources by calling the Scaleway REST API directly.
+///     Uses tag-based find-or-create for idempotent deployments (no external state files).
 /// </summary>
 public sealed class ScalewayProvisioner : IDisposable
 {
     private const string AspireAppTag = "aspire-app";
     private const string AspireResourceTag = "aspire-resource";
+    private readonly string _appName;
 
     private readonly ScalewayApiClient _client;
-    private readonly string _appName;
     private readonly string _projectId;
 
     public ScalewayProvisioner(ScalewayCredentialConfig credentials, string appName)
@@ -20,7 +20,7 @@ public sealed class ScalewayProvisioner : IDisposable
         _client = new ScalewayApiClient(credentials);
         _appName = appName;
         _projectId = credentials.DefaultProjectId
-            ?? throw new InvalidOperationException("SCW_DEFAULT_PROJECT_ID is required for provisioning.");
+                     ?? throw new InvalidOperationException("SCW_DEFAULT_PROJECT_ID is required for provisioning.");
     }
 
     internal ScalewayProvisioner(HttpClient httpClient, string appName, string projectId)
@@ -30,8 +30,13 @@ public sealed class ScalewayProvisioner : IDisposable
         _projectId = projectId;
     }
 
+    public void Dispose()
+    {
+        _client.Dispose();
+    }
+
     /// <summary>
-    /// Provisions or updates a Scaleway RDB instance.
+    ///     Provisions or updates a Scaleway RDB instance.
     /// </summary>
     public async Task<ProvisioningResult> ProvisionRdbInstanceAsync(string resourceName, ScalewayRdbPublishConfig config, CancellationToken cancellationToken = default)
     {
@@ -65,7 +70,7 @@ public sealed class ScalewayProvisioner : IDisposable
     }
 
     /// <summary>
-    /// Provisions or updates a Scaleway Redis cluster.
+    ///     Provisions or updates a Scaleway Redis cluster.
     /// </summary>
     public async Task<ProvisioningResult> ProvisionRedisClusterAsync(string resourceName, ScalewayRedisPublishConfig config, CancellationToken cancellationToken = default)
     {
@@ -98,7 +103,7 @@ public sealed class ScalewayProvisioner : IDisposable
     }
 
     /// <summary>
-    /// Finds an existing resource by matching aspire-app and aspire-resource tags.
+    ///     Finds an existing resource by matching aspire-app and aspire-resource tags.
     /// </summary>
     private async Task<JsonElement?> FindExistingResourceAsync(string apiPath, string regionOrZone, string resourceName, CancellationToken cancellationToken)
     {
@@ -135,14 +140,9 @@ public sealed class ScalewayProvisioner : IDisposable
     {
         return $"Aspire-{Guid.NewGuid():N}"[..32];
     }
-
-    public void Dispose()
-    {
-        _client.Dispose();
-    }
 }
 
 /// <summary>
-/// Result of a provisioning operation.
+///     Result of a provisioning operation.
 /// </summary>
 public sealed record ProvisioningResult(string ResourceId, JsonElement ApiResponse);

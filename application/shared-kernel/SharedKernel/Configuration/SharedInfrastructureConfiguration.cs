@@ -114,6 +114,7 @@ public static class SharedInfrastructureConfiguration
                         (sp, _) => new S3BlobStorageClient(new AmazonS3Client(new AmazonS3Config { ServiceURL = "http://localhost:8333", ForcePathStyle = true }), "http://localhost:8333", sp.GetRequiredService<TimeProvider>())
                     );
                 }
+
                 return builder;
             }
 

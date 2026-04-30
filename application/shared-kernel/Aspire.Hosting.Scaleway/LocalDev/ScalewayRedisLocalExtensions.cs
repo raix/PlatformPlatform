@@ -1,12 +1,10 @@
-using Aspire.Hosting.Scaleway;
-
-namespace Aspire.Hosting;
+namespace Aspire.Hosting.Scaleway.LocalDev;
 
 public static class ScalewayRedisLocalExtensions
 {
     /// <summary>
-    /// Configures the Scaleway Redis cluster to run as a local Redis container during development.
-    /// In publish mode, the resource remains a Scaleway cloud resource.
+    ///     Configures the Scaleway Redis cluster to run as a local Redis container during development.
+    ///     In publish mode, the resource remains a Scaleway cloud resource.
     /// </summary>
     public static IResourceBuilder<ScalewayRedisClusterResource> RunAsRedisContainer(
         this IResourceBuilder<ScalewayRedisClusterResource> builder,

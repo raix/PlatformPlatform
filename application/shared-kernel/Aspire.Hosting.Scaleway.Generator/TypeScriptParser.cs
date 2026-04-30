@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace Aspire.Hosting.Scaleway.Generator;
 
 /// <summary>
-/// Parses TypeScript types.gen.ts files from the Scaleway JS SDK.
+///     Parses TypeScript types.gen.ts files from the Scaleway JS SDK.
 /// </summary>
 public static partial class TypeScriptParser
 {

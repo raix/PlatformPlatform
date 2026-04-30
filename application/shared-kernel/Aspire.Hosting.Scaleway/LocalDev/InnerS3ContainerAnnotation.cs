@@ -1,8 +1,8 @@
-namespace Aspire.Hosting.Scaleway;
+namespace Aspire.Hosting.Scaleway.LocalDev;
 
 /// <summary>
-/// Annotation that stores a reference to the inner S3-compatible container
-/// created by RunAsSeaweedFsContainer/RunAsMinioContainer, so WithReference can wire the S3 endpoint.
+///     Annotation that stores a reference to the inner S3-compatible container
+///     created by RunAsSeaweedFsContainer/RunAsMinioContainer, so WithReference can wire the S3 endpoint.
 /// </summary>
 internal sealed class InnerS3ContainerAnnotation(IResourceBuilder<ContainerResource> innerBuilder, string endpointName) : IResourceAnnotation
 {

@@ -15,22 +15,26 @@ public sealed class ScalewayTokenSigningClientTests
         // Arrange
         var signingKey = Convert.ToBase64String(new byte[64]); // 512-bit key
         var httpClient = CreateMockHttpClient(request =>
-        {
-            var url = request.RequestUri!.PathAndQuery;
-            if (url.Contains("secret_name=authentication-token-signing-key"))
             {
-                return CreateSecretResponse(signingKey);
+                var url = request.RequestUri!.PathAndQuery;
+                if (url.Contains("secret_name=authentication-token-signing-key"))
+                {
+                    return CreateSecretResponse(signingKey);
+                }
+
+                if (url.Contains("secret_name=authentication-token-issuer"))
+                {
+                    return CreateSecretResponse("https://my-app.scaleway.com");
+                }
+
+                if (url.Contains("secret_name=authentication-token-audience"))
+                {
+                    return CreateSecretResponse("my-app-audience");
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
             }
-            if (url.Contains("secret_name=authentication-token-issuer"))
-            {
-                return CreateSecretResponse("https://my-app.scaleway.com");
-            }
-            if (url.Contains("secret_name=authentication-token-audience"))
-            {
-                return CreateSecretResponse("my-app-audience");
-            }
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
-        });
+        );
 
         // Act
         var client = new ScalewayTokenSigningClient(httpClient, "fr-par", "test-project");
@@ -61,18 +65,21 @@ public sealed class ScalewayTokenSigningClientTests
         // Arrange
         var signingKey = Convert.ToBase64String(new byte[64]);
         var httpClient = CreateMockHttpClient(request =>
-        {
-            var url = request.RequestUri!.PathAndQuery;
-            if (url.Contains("secret_name=authentication-token-issuer"))
             {
-                return CreateSecretResponse("test-issuer");
+                var url = request.RequestUri!.PathAndQuery;
+                if (url.Contains("secret_name=authentication-token-issuer"))
+                {
+                    return CreateSecretResponse("test-issuer");
+                }
+
+                if (url.Contains("secret_name=authentication-token-audience"))
+                {
+                    return CreateSecretResponse("test-audience");
+                }
+
+                return CreateSecretResponse(signingKey);
             }
-            if (url.Contains("secret_name=authentication-token-audience"))
-            {
-                return CreateSecretResponse("test-audience");
-            }
-            return CreateSecretResponse(signingKey);
-        });
+        );
         var client = new ScalewayTokenSigningClient(httpClient, "fr-par", "test-project");
 
         // Act
@@ -95,10 +102,11 @@ public sealed class ScalewayTokenSigningClientTests
         var capturedUrls = new List<string>();
         var signingKey = Convert.ToBase64String(new byte[64]);
         var httpClient = CreateMockHttpClient(request =>
-        {
-            capturedUrls.Add(request.RequestUri!.PathAndQuery);
-            return CreateSecretResponse(signingKey);
-        });
+            {
+                capturedUrls.Add(request.RequestUri!.PathAndQuery);
+                return CreateSecretResponse(signingKey);
+            }
+        );
 
         // Act
         _ = new ScalewayTokenSigningClient(httpClient, "nl-ams", "my-project-id");
@@ -106,10 +114,11 @@ public sealed class ScalewayTokenSigningClientTests
         // Assert
         capturedUrls.Should().HaveCount(3);
         capturedUrls.Should().AllSatisfy(url =>
-        {
-            url.Should().Contain("/secret-manager/v1beta1/regions/nl-ams/secrets-by-path/versions/latest_enabled/access");
-            url.Should().Contain("project_id=my-project-id");
-        });
+            {
+                url.Should().Contain("/secret-manager/v1beta1/regions/nl-ams/secrets-by-path/versions/latest_enabled/access");
+                url.Should().Contain("project_id=my-project-id");
+            }
+        );
     }
 
     [Fact]
@@ -119,10 +128,11 @@ public sealed class ScalewayTokenSigningClientTests
         string? capturedAuthToken = null;
         var signingKey = Convert.ToBase64String(new byte[64]);
         var httpClient = CreateMockHttpClient(request =>
-        {
-            capturedAuthToken ??= request.Headers.TryGetValues("X-Auth-Token", out var values) ? values.First() : null;
-            return CreateSecretResponse(signingKey);
-        });
+            {
+                capturedAuthToken ??= request.Headers.TryGetValues("X-Auth-Token", out var values) ? values.First() : null;
+                return CreateSecretResponse(signingKey);
+            }
+        );
         httpClient.DefaultRequestHeaders.Add("X-Auth-Token", "my-secret-key");
 
         // Act

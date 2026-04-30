@@ -1,13 +1,13 @@
 namespace Aspire.Hosting.Scaleway.Generator;
 
 /// <summary>
-/// Maps TypeScript types from Scaleway SDK to C# types.
+///     Maps TypeScript types from Scaleway SDK to C# types.
 /// </summary>
 public static class TypeMapper
 {
     /// <summary>
-    /// Maps a TypeScript type to its C# equivalent.
-    /// Returns null if the type should be skipped (complex interface type).
+    ///     Maps a TypeScript type to its C# equivalent.
+    ///     Returns null if the type should be skipped (complex interface type).
     /// </summary>
     public static string? MapType(string typeScriptType, bool isOptional, HashSet<string> knownEnums)
     {
@@ -26,15 +26,18 @@ public static class TypeMapper
     }
 
     /// <summary>
-    /// Returns the default value expression for a C# type, or null if none is needed.
+    ///     Returns the default value expression for a C# type, or null if none is needed.
     /// </summary>
-    public static string? GetDefaultValue(string csharpType) => csharpType switch
+    public static string? GetDefaultValue(string csharpType)
     {
-        "string" => "string.Empty",
-        "ScalewayRegion" => "ScalewayRegion.FrPar",
-        "ScalewayZone" => "ScalewayZone.FrPar1",
-        _ => null
-    };
+        return csharpType switch
+        {
+            "string" => "string.Empty",
+            "ScalewayRegion" => "ScalewayRegion.FrPar",
+            "ScalewayZone" => "ScalewayZone.FrPar1",
+            _ => null
+        };
+    }
 
     private static string? ResolveCustomType(string typeScriptType, bool isOptional, HashSet<string> knownEnums)
     {
@@ -55,7 +58,7 @@ public static class TypeMapper
     }
 
     /// <summary>
-    /// Resolves a custom type with the actual service prefix applied.
+    ///     Resolves a custom type with the actual service prefix applied.
     /// </summary>
     public static string ResolveServicePrefix(string type, string servicePrefix)
     {

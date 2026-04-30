@@ -1,7 +1,7 @@
-namespace Aspire.Hosting.Scaleway;
+namespace Aspire.Hosting.Scaleway.Provisioning;
 
 /// <summary>
-/// Annotation that marks a resource for provisioning as a Scaleway Object Storage bucket.
+///     Annotation that marks a resource for provisioning as a Scaleway Object Storage bucket.
 /// </summary>
 public sealed class PublishAsScalewayObjectStorageAnnotation : IScalewayPublishTargetAnnotation
 {
@@ -9,7 +9,7 @@ public sealed class PublishAsScalewayObjectStorageAnnotation : IScalewayPublishT
 }
 
 /// <summary>
-/// Configuration for publishing Scaleway Object Storage buckets.
+///     Configuration for publishing Scaleway Object Storage buckets.
 /// </summary>
 public sealed class ScalewayObjectStoragePublishConfig
 {

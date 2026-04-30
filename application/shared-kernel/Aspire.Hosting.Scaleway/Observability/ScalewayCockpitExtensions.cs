@@ -1,12 +1,10 @@
-using Aspire.Hosting.Scaleway;
-
-namespace Aspire.Hosting;
+namespace Aspire.Hosting.Scaleway.Observability;
 
 public static class ScalewayCockpitExtensions
 {
     /// <summary>
-    /// Configures OpenTelemetry environment variables to push traces, metrics, and logs to Scaleway Cockpit.
-    /// Scaleway Cockpit uses separate OTLP endpoints per signal type with bearer token authentication.
+    ///     Configures OpenTelemetry environment variables to push traces, metrics, and logs to Scaleway Cockpit.
+    ///     Scaleway Cockpit uses separate OTLP endpoints per signal type with bearer token authentication.
     /// </summary>
     /// <param name="builder">The project resource builder.</param>
     /// <param name="region">Scaleway region (e.g., fr-par, nl-ams, pl-waw).</param>
@@ -25,13 +23,14 @@ public static class ScalewayCockpitExtensions
         builder.WithEnvironment("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", $"https://{dataSourceId}.metrics.cockpit.{regionString}.scw.cloud/otlp/v1/metrics");
         builder.WithEnvironment("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", $"https://{dataSourceId}.logs.cockpit.{regionString}.scw.cloud/otlp/v1/logs");
         builder.WithEnvironment(context =>
-        {
-            var token = Environment.GetEnvironmentVariable(tokenParameterName);
-            if (token is not null)
             {
-                context.EnvironmentVariables["OTEL_EXPORTER_OTLP_HEADERS"] = $"Authorization=Bearer {token}";
+                var token = Environment.GetEnvironmentVariable(tokenParameterName);
+                if (token is not null)
+                {
+                    context.EnvironmentVariables["OTEL_EXPORTER_OTLP_HEADERS"] = $"Authorization=Bearer {token}";
+                }
             }
-        });
+        );
 
         return builder;
     }

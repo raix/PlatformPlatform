@@ -1,13 +1,11 @@
-using Aspire.Hosting.Scaleway;
-
-namespace Aspire.Hosting;
+namespace Aspire.Hosting.Scaleway.LocalDev;
 
 public static class ScalewayTemLocalExtensions
 {
     /// <summary>
-    /// Configures the Scaleway TEM domain to run as a local Mailpit container during development.
-    /// Mailpit captures all outgoing emails and provides a web UI for viewing them.
-    /// In publish mode, the resource remains a Scaleway cloud resource.
+    ///     Configures the Scaleway TEM domain to run as a local Mailpit container during development.
+    ///     Mailpit captures all outgoing emails and provides a web UI for viewing them.
+    ///     In publish mode, the resource remains a Scaleway cloud resource.
     /// </summary>
     public static IResourceBuilder<ScalewayTemDomainResource> RunAsMailpitContainer(
         this IResourceBuilder<ScalewayTemDomainResource> builder,
@@ -22,8 +20,8 @@ public static class ScalewayTemLocalExtensions
 
         var containerBuilder = builder.ApplicationBuilder
             .AddContainer($"{builder.Resource.Name}-mailpit", "axllent/mailpit")
-            .WithHttpEndpoint(port: httpPort, targetPort: 8025, name: "http")
-            .WithEndpoint(port: smtpPort, targetPort: 1025, name: "smtp")
+            .WithHttpEndpoint(httpPort, 8025, "http")
+            .WithEndpoint(smtpPort, 1025, name: "smtp")
             .WithLifetime(ContainerLifetime.Persistent)
             .WithUrlForEndpoint("http", u => u.DisplayText = "Read mail here");
 

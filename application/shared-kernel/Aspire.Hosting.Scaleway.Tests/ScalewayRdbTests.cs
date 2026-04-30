@@ -1,5 +1,3 @@
-using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;
@@ -64,7 +62,7 @@ public sealed class ScalewayRdbTests
         database.Resource.Should().BeAssignableTo<IResourceWithConnectionString>();
         database.Resource.Name.Should().Be("account-database");
         database.Resource.Should().BeOfType<PostgresDatabaseResource>();
-        ((PostgresDatabaseResource)database.Resource).DatabaseName.Should().Be("account");
+        database.Resource.DatabaseName.Should().Be("account");
     }
 
     [Fact]
@@ -84,9 +82,9 @@ public sealed class ScalewayRdbTests
         mainDb.Resource.Name.Should().Be("main-database");
 
         // All should share the same parent PostgreSQL server
-        var accountParent = ((PostgresDatabaseResource)accountDb.Resource).Parent;
-        var backOfficeParent = ((PostgresDatabaseResource)backOfficeDb.Resource).Parent;
-        var mainParent = ((PostgresDatabaseResource)mainDb.Resource).Parent;
+        var accountParent = accountDb.Resource.Parent;
+        var backOfficeParent = backOfficeDb.Resource.Parent;
+        var mainParent = mainDb.Resource.Parent;
 
         accountParent.Should().BeSameAs(backOfficeParent);
         backOfficeParent.Should().BeSameAs(mainParent);
@@ -100,10 +98,11 @@ public sealed class ScalewayRdbTests
 
         builder.AddScalewayRdbInstance("postgres")
             .RunAsPostgresContainer(c =>
-            {
-                configured = true;
-                c.WithLifetime(ContainerLifetime.Persistent);
-            });
+                {
+                    configured = true;
+                    c.WithLifetime(ContainerLifetime.Persistent);
+                }
+            );
 
         configured.Should().BeTrue();
     }

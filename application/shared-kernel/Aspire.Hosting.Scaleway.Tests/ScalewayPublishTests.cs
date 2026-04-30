@@ -1,5 +1,3 @@
-using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.Scaleway;
 using FluentAssertions;
 
 namespace Aspire.Hosting.Scaleway.Tests;
@@ -25,13 +23,14 @@ public sealed class ScalewayPublishTests
 
         var rdb = builder.AddScalewayRdbInstance("my-db")
             .PublishAsScalewayRdb(config =>
-            {
-                config.Engine = "PostgreSQL-16";
-                config.NodeType = "DB-GP-XL";
-                config.IsHaCluster = true;
-                config.VolumeSizeInGb = 100;
-                config.Region = ScalewayRegion.NlAms;
-            });
+                {
+                    config.Engine = "PostgreSQL-16";
+                    config.NodeType = "DB-GP-XL";
+                    config.IsHaCluster = true;
+                    config.VolumeSizeInGb = 100;
+                    config.Region = ScalewayRegion.NlAms;
+                }
+            );
 
         var annotation = rdb.Resource.Annotations.OfType<PublishAsScalewayRdbAnnotation>().Single();
         annotation.Config.Engine.Should().Be("PostgreSQL-16");
@@ -48,11 +47,12 @@ public sealed class ScalewayPublishTests
 
         var redis = builder.AddScalewayRedisCluster("my-cache")
             .PublishAsScalewayRedis(config =>
-            {
-                config.NodeType = "RED1-M";
-                config.ClusterSize = 3;
-                config.Zone = ScalewayZone.FrPar2;
-            });
+                {
+                    config.NodeType = "RED1-M";
+                    config.ClusterSize = 3;
+                    config.Zone = ScalewayZone.FrPar2;
+                }
+            );
 
         var annotation = redis.Resource.Annotations.OfType<PublishAsScalewayRedisAnnotation>().Single();
         annotation.Config.NodeType.Should().Be("RED1-M");
@@ -67,11 +67,12 @@ public sealed class ScalewayPublishTests
 
         var storage = builder.AddScalewayObjectStorage("my-storage")
             .PublishAsScalewayObjectStorage(config =>
-            {
-                config.Acl = ScalewayBucketAcl.PublicRead;
-                config.Versioning = true;
-                config.Region = ScalewayRegion.PlWaw;
-            });
+                {
+                    config.Acl = ScalewayBucketAcl.PublicRead;
+                    config.Versioning = true;
+                    config.Region = ScalewayRegion.PlWaw;
+                }
+            );
 
         var annotation = storage.Resource.Annotations.OfType<PublishAsScalewayObjectStorageAnnotation>().Single();
         annotation.Config.Acl.Should().Be(ScalewayBucketAcl.PublicRead);
@@ -129,19 +130,20 @@ public sealed class ScalewayPublishTests
 
         var rdb = builder.AddScalewayRdbInstance("my-db")
             .PublishAsScalewayRdb(config =>
-            {
-                if (isProduction)
                 {
-                    config.NodeType = "DB-GP-XL";
-                    config.IsHaCluster = true;
-                    config.VolumeSizeInGb = 500;
+                    if (isProduction)
+                    {
+                        config.NodeType = "DB-GP-XL";
+                        config.IsHaCluster = true;
+                        config.VolumeSizeInGb = 500;
+                    }
+                    else
+                    {
+                        config.NodeType = "DB-DEV-S";
+                        config.VolumeSizeInGb = 5;
+                    }
                 }
-                else
-                {
-                    config.NodeType = "DB-DEV-S";
-                    config.VolumeSizeInGb = 5;
-                }
-            });
+            );
 
         var annotation = rdb.Resource.Annotations.OfType<PublishAsScalewayRdbAnnotation>().Single();
         annotation.Config.NodeType.Should().Be("DB-DEV-S");

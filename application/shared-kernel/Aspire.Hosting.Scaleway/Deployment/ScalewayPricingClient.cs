@@ -1,24 +1,27 @@
 using System.Text.Json;
 
-namespace Aspire.Hosting.Scaleway;
+namespace Aspire.Hosting.Scaleway.Deployment;
 
 /// <summary>
-/// Fetches pricing from the Scaleway Product Catalog API and estimates monthly costs for resources.
-/// The Product Catalog is a public API (no authentication required).
+///     Fetches pricing from the Scaleway Product Catalog API and estimates monthly costs for resources.
+///     The Product Catalog is a public API (no authentication required).
 /// </summary>
-public sealed class ScalewayPricingClient : IDisposable
+public sealed class ScalewayPricingClient(HttpClient httpClient) : IDisposable
 {
     private const string CatalogBaseUrl = "https://api.scaleway.com";
-    private readonly HttpClient _httpClient;
     private Dictionary<string, CatalogProduct>? _catalogCache;
 
-    public ScalewayPricingClient(HttpClient? httpClient = null)
+    public ScalewayPricingClient() : this(new HttpClient { BaseAddress = new Uri(CatalogBaseUrl) })
     {
-        _httpClient = httpClient ?? new HttpClient { BaseAddress = new Uri(CatalogBaseUrl) };
+    }
+
+    public void Dispose()
+    {
+        httpClient.Dispose();
     }
 
     /// <summary>
-    /// Estimates the monthly cost of a resource configuration.
+    ///     Estimates the monthly cost of a resource configuration.
     /// </summary>
     public async Task<CostEstimate> EstimateRdbCostAsync(ScalewayRdbPublishConfig config, CancellationToken cancellationToken = default)
     {
@@ -28,16 +31,16 @@ public sealed class ScalewayPricingClient : IDisposable
         var multiplier = config.IsHaCluster ? 2m : 1m;
 
         return new CostEstimate(
-            ResourceType: "rdb",
-            NodeType: config.NodeType,
-            MonthlyPrice: hourlyRate * monthlyHours * multiplier,
-            Currency: "EUR",
-            Details: config.IsHaCluster ? $"{config.NodeType} x2 (HA)" : config.NodeType
+            "rdb",
+            config.NodeType,
+            hourlyRate * monthlyHours * multiplier,
+            "EUR",
+            config.IsHaCluster ? $"{config.NodeType} x2 (HA)" : config.NodeType
         );
     }
 
     /// <summary>
-    /// Estimates the monthly cost of a Redis cluster.
+    ///     Estimates the monthly cost of a Redis cluster.
     /// </summary>
     public async Task<CostEstimate> EstimateRedisCostAsync(ScalewayRedisPublishConfig config, CancellationToken cancellationToken = default)
     {
@@ -46,17 +49,17 @@ public sealed class ScalewayPricingClient : IDisposable
         var monthlyHours = 730m;
 
         return new CostEstimate(
-            ResourceType: "redis",
-            NodeType: config.NodeType,
-            MonthlyPrice: hourlyRate * monthlyHours * config.ClusterSize,
-            Currency: "EUR",
-            Details: config.ClusterSize > 1 ? $"{config.NodeType} x{config.ClusterSize}" : config.NodeType
+            "redis",
+            config.NodeType,
+            hourlyRate * monthlyHours * config.ClusterSize,
+            "EUR",
+            config.ClusterSize > 1 ? $"{config.NodeType} x{config.ClusterSize}" : config.NodeType
         );
     }
 
     /// <summary>
-    /// Estimates the monthly cost of a Serverless Container.
-    /// Returns a range since containers scale between min and max.
+    ///     Estimates the monthly cost of a Serverless Container.
+    ///     Returns a range since containers scale between min and max.
     /// </summary>
     public Task<CostEstimate> EstimateContainerCostAsync(ScalewayContainerPublishConfig config, CancellationToken cancellationToken = default)
     {
@@ -76,19 +79,22 @@ public sealed class ScalewayPricingClient : IDisposable
         var maxMonthlyCost = (vCpus * vCpuPerSecond + memoryGb * memoryPerGbPerSecond) * secondsPerMonth * config.MaxScale;
 
         return Task.FromResult(new CostEstimate(
-            ResourceType: "container",
-            NodeType: $"{config.MemoryLimitMb}MB/{config.CpuLimitMillicores}mVCPU",
-            MonthlyPrice: minMonthlyCost,
-            Currency: "EUR",
-            Details: $"€{minMonthlyCost:F2}-€{maxMonthlyCost:F2}/month ({config.MinScale}-{config.MaxScale} scale)"
-        ));
+                "container",
+                $"{config.MemoryLimitMb}MB/{config.CpuLimitMillicores}mVCPU",
+                minMonthlyCost,
+                "EUR",
+                $"€{minMonthlyCost:F2}-€{maxMonthlyCost:F2}/month ({config.MinScale}-{config.MaxScale} scale)"
+            )
+        );
     }
 
     /// <summary>
-    /// Estimates costs for all resources in a deployment and returns a summary.
+    ///     Estimates costs for all resources in a deployment and returns a summary.
     /// </summary>
     public async Task<DeploymentCostSummary> EstimateDeploymentCostAsync(
-        IEnumerable<IResource> resources, ScalewayRegion defaultRegion, CancellationToken cancellationToken = default)
+        IEnumerable<IResource> resources,
+        ScalewayRegion defaultRegion,
+        CancellationToken cancellationToken = default)
     {
         var estimates = new List<CostEstimate>();
 
@@ -119,7 +125,7 @@ public sealed class ScalewayPricingClient : IDisposable
         if (_catalogCache is not null) return _catalogCache;
 
         var url = $"/product-catalog/v2alpha1/public-catalog/products?region={region.ToApiString()}&page_size=100";
-        var response = await _httpClient.GetAsync(url, cancellationToken);
+        var response = await httpClient.GetAsync(url, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -158,11 +164,6 @@ public sealed class ScalewayPricingClient : IDisposable
     private static decimal FindPrice(Dictionary<string, CatalogProduct> catalog, string nodeType)
     {
         return catalog.TryGetValue(nodeType, out var product) ? product.HourlyPrice : 0m;
-    }
-
-    public void Dispose()
-    {
-        _httpClient.Dispose();
     }
 }
 

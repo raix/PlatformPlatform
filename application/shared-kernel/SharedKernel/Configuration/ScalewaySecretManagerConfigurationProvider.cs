@@ -1,18 +1,19 @@
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 
 namespace SharedKernel.Configuration;
 
 /// <summary>
-/// .NET configuration provider that loads secrets from Scaleway Secret Manager.
-/// Secrets are fetched via the REST API and injected into the configuration system.
-/// Supports periodic refresh to pick up secret rotations.
+///     .NET configuration provider that loads secrets from Scaleway Secret Manager.
+///     Secrets are fetched via the REST API and injected into the configuration system.
+///     Supports periodic refresh to pick up secret rotations.
 /// </summary>
 public sealed class ScalewaySecretManagerConfigurationProvider : ConfigurationProvider, IDisposable
 {
-    private readonly ScalewaySecretManagerOptions _options;
     private readonly HttpClient _httpClient;
+    private readonly ScalewaySecretManagerOptions _options;
     private readonly Timer? _refreshTimer;
 
     public ScalewaySecretManagerConfigurationProvider(ScalewaySecretManagerOptions options, HttpClient? httpClient = null)
@@ -28,6 +29,12 @@ public sealed class ScalewaySecretManagerConfigurationProvider : ConfigurationPr
         {
             _refreshTimer = new Timer(_ => LoadAsync().ConfigureAwait(false), null, options.ReloadInterval.Value, options.ReloadInterval.Value);
         }
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+        _httpClient.Dispose();
     }
 
     public override void Load()
@@ -105,7 +112,7 @@ public sealed class ScalewaySecretManagerConfigurationProvider : ConfigurationPr
             if (base64 is not null)
             {
                 var bytes = Convert.FromBase64String(base64);
-                return System.Text.Encoding.UTF8.GetString(bytes);
+                return Encoding.UTF8.GetString(bytes);
             }
         }
 
@@ -119,12 +126,6 @@ public sealed class ScalewaySecretManagerConfigurationProvider : ConfigurationPr
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         return client;
     }
-
-    public void Dispose()
-    {
-        _refreshTimer?.Dispose();
-        _httpClient.Dispose();
-    }
 }
 
 public sealed class ScalewaySecretManagerOptions
@@ -135,11 +136,11 @@ public sealed class ScalewaySecretManagerOptions
 
     public string Region { get; set; } = "fr-par";
 
-    public string ApiUrl { get; set; } = "https://api.scaleway.com";
+    public string ApiUrl { get; init; } = "https://api.scaleway.com";
 
     public string[]? Tags { get; set; }
 
-    public TimeSpan? ReloadInterval { get; set; }
+    public TimeSpan? ReloadInterval { get; init; }
 }
 
 public sealed class ScalewaySecretManagerConfigurationSource(ScalewaySecretManagerOptions options) : IConfigurationSource
@@ -153,8 +154,8 @@ public sealed class ScalewaySecretManagerConfigurationSource(ScalewaySecretManag
 public static class ScalewaySecretManagerConfigurationExtensions
 {
     /// <summary>
-    /// Adds Scaleway Secret Manager as a configuration source.
-    /// Secrets are loaded at startup and optionally refreshed on an interval.
+    ///     Adds Scaleway Secret Manager as a configuration source.
+    ///     Secrets are loaded at startup and optionally refreshed on an interval.
     /// </summary>
     public static IConfigurationBuilder AddScalewaySecretManager(
         this IConfigurationBuilder builder,

@@ -8,8 +8,8 @@ using Microsoft.Extensions.Logging;
 namespace Aspire.Hosting.Scaleway.Tests.MockServer;
 
 /// <summary>
-/// Lightweight mock HTTP server that simulates the Scaleway REST API.
-/// Tracks all received requests and maintains an in-memory resource store.
+///     Lightweight mock HTTP server that simulates the Scaleway REST API.
+///     Tracks all received requests and maintains an in-memory resource store.
 /// </summary>
 public sealed class ScalewayMockServer : IDisposable
 {
@@ -27,81 +27,94 @@ public sealed class ScalewayMockServer : IDisposable
 
         // Use middleware to catch all requests regardless of path
         _app.Run(async context =>
-        {
-            var method = context.Request.Method;
-            var path = context.Request.Path.Value ?? "/";
-            var query = context.Request.QueryString.Value ?? "";
-            var body = method is "POST" or "PATCH" or "PUT"
-                ? await new StreamReader(context.Request.Body).ReadToEndAsync()
-                : null;
-
-            _requests.Enqueue(new RecordedRequest(method, path + query, body, DateTimeOffset.UtcNow));
-
-            var resourceType = ExtractResourceType(path);
-            var arrayName = GetArrayName(resourceType);
-
-            switch (method)
             {
-                case "GET":
+                var method = context.Request.Method;
+                var path = context.Request.Path.Value ?? "/";
+                var query = context.Request.QueryString.Value ?? "";
+                var body = method is "POST" or "PATCH" or "PUT"
+                    ? await new StreamReader(context.Request.Body).ReadToEndAsync()
+                    : null;
+
+                _requests.Enqueue(new RecordedRequest(method, path + query, body, DateTimeOffset.UtcNow));
+
+                var resourceType = ExtractResourceType(path);
+                var arrayName = GetArrayName(resourceType);
+
+                switch (method)
                 {
-                    var nameFilter = context.Request.Query["name"].FirstOrDefault();
-                    var items = _resources.GetValueOrDefault(resourceType, []);
-                    if (nameFilter is not null)
+                    case "GET":
                     {
-                        items = items.Where(r => r.TryGetProperty("name", out var n) && n.GetString() == nameFilter).ToList();
-                    }
-
-                    var json = JsonSerializer.Serialize(new Dictionary<string, object>
-                    {
-                        [arrayName] = items,
-                        ["total_count"] = items.Count
-                    });
-                    context.Response.ContentType = "application/json";
-                    await context.Response.WriteAsync(json);
-                    break;
-                }
-                case "POST":
-                {
-                    var id = $"{resourceType}-{Interlocked.Increment(ref _idCounter)}";
-                    var properties = new Dictionary<string, object> { ["id"] = id, ["status"] = "provisioning" };
-
-                    // Inject region/zone from the URL path (Scaleway API includes these in responses)
-                    var regionOrZone = ExtractRegionOrZone(path);
-                    if (regionOrZone is not null)
-                    {
-                        if (path.Contains("/zones/")) properties["zone"] = regionOrZone;
-                        else properties["region"] = regionOrZone;
-                    }
-
-                    if (body is not null)
-                    {
-                        var doc = JsonDocument.Parse(body);
-                        foreach (var prop in doc.RootElement.EnumerateObject())
+                        var nameFilter = context.Request.Query["name"].FirstOrDefault();
+                        var items = _resources.GetValueOrDefault(resourceType, []);
+                        if (nameFilter is not null)
                         {
-                            properties[prop.Name] = prop.Value;
+                            items = items.Where(r => r.TryGetProperty("name", out var n) && n.GetString() == nameFilter).ToList();
                         }
+
+                        var json = JsonSerializer.Serialize(new Dictionary<string, object>
+                            {
+                                [arrayName] = items,
+                                ["total_count"] = items.Count
+                            }
+                        );
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsync(json);
+                        break;
                     }
+                    case "POST":
+                    {
+                        var id = $"{resourceType}-{Interlocked.Increment(ref _idCounter)}";
+                        var properties = new Dictionary<string, object> { ["id"] = id, ["status"] = "provisioning" };
 
-                    var resourceJson = JsonDocument.Parse(JsonSerializer.Serialize(properties)).RootElement;
-                    _resources.AddOrUpdate(resourceType, _ => [resourceJson], (_, list) => { list.Add(resourceJson); return list; });
+                        // Inject region/zone from the URL path (Scaleway API includes these in responses)
+                        var regionOrZone = ExtractRegionOrZone(path);
+                        if (regionOrZone is not null)
+                        {
+                            if (path.Contains("/zones/"))
+                            {
+                                properties["zone"] = regionOrZone;
+                            }
+                            else
+                            {
+                                properties["region"] = regionOrZone;
+                            }
+                        }
 
-                    context.Response.ContentType = "application/json";
-                    await context.Response.WriteAsync(JsonSerializer.Serialize(properties));
-                    break;
-                }
-                case "PATCH":
-                {
-                    context.Response.ContentType = "application/json";
-                    await context.Response.WriteAsync("""{"id": "patched", "status": "ready"}""");
-                    break;
-                }
-                case "DELETE":
-                {
-                    context.Response.StatusCode = 204;
-                    break;
+                        if (body is not null)
+                        {
+                            var doc = JsonDocument.Parse(body);
+                            foreach (var prop in doc.RootElement.EnumerateObject())
+                            {
+                                properties[prop.Name] = prop.Value;
+                            }
+                        }
+
+                        var resourceJson = JsonDocument.Parse(JsonSerializer.Serialize(properties)).RootElement;
+                        _resources.AddOrUpdate(resourceType, _ => [resourceJson], (_, list) =>
+                            {
+                                list.Add(resourceJson);
+                                return list;
+                            }
+                        );
+
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsync(JsonSerializer.Serialize(properties));
+                        break;
+                    }
+                    case "PATCH":
+                    {
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsync("""{"id": "patched", "status": "ready"}""");
+                        break;
+                    }
+                    case "DELETE":
+                    {
+                        context.Response.StatusCode = 204;
+                        break;
+                    }
                 }
             }
-        });
+        );
     }
 
     public string Url => _app.Urls.First();
@@ -109,6 +122,12 @@ public sealed class ScalewayMockServer : IDisposable
     public IReadOnlyList<RecordedRequest> ReceivedRequests => [.. _requests];
 
     public IReadOnlyDictionary<string, List<JsonElement>> Resources => _resources;
+
+    public void Dispose()
+    {
+        _app.StopAsync().GetAwaiter().GetResult();
+        _app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
 
     public void Start()
     {
@@ -130,8 +149,10 @@ public sealed class ScalewayMockServer : IDisposable
             {
                 continue;
             }
+
             return segment;
         }
+
         return "unknown";
     }
 
@@ -145,19 +166,17 @@ public sealed class ScalewayMockServer : IDisposable
                 return segments[i + 1];
             }
         }
+
         return null;
     }
 
-    private static string GetArrayName(string resourceType) => resourceType switch
+    private static string GetArrayName(string resourceType)
     {
-        "private-networks" => "private_networks",
-        _ => resourceType.Replace("-", "_")
-    };
-
-    public void Dispose()
-    {
-        _app.StopAsync().GetAwaiter().GetResult();
-        _app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        return resourceType switch
+        {
+            "private-networks" => "private_networks",
+            _ => resourceType.Replace("-", "_")
+        };
     }
 }
 

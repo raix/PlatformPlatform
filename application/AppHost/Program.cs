@@ -1,7 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
 using AppHost;
-using Aspire.Hosting.Scaleway;
+using Aspire.Hosting.Scaleway.LocalDev;
+using Aspire.Hosting.Scaleway.Storage;
 using Projects;
 
 // Check for port conflicts before starting
@@ -26,10 +27,10 @@ var postgres = builder.AddScalewayRdbInstance("postgres")
     );
 
 var objectStorage = builder.AddScalewayObjectStorage("object-storage")
-    .RunAsSeaweedFsContainer(s3Port: 8333);
+    .RunAsSeaweedFsContainer(8333);
 
 builder.AddScalewayTemDomain("mail-server")
-    .RunAsMailpitContainer(httpPort: 9003, smtpPort: 9004);
+    .RunAsMailpitContainer(9003, 9004);
 
 var frontendBuild = builder
     .AddJavaScriptApp("frontend-build", "../")

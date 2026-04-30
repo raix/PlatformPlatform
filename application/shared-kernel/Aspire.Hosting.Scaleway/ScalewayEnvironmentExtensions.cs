@@ -1,13 +1,11 @@
-using Aspire.Hosting.Scaleway;
-
-namespace Aspire.Hosting;
+namespace Aspire.Hosting.Scaleway;
 
 public static class ScalewayEnvironmentExtensions
 {
     /// <summary>
-    /// Adds a Scaleway deployment environment to the distributed application.
-    /// This is the root resource that owns shared infrastructure: private network, container registry,
-    /// and container namespace. Mirrors the AWSCDKEnvironmentResource pattern.
+    ///     Adds a Scaleway deployment environment to the distributed application.
+    ///     This is the root resource that owns shared infrastructure: private network, container registry,
+    ///     and container namespace. Mirrors the AWSCDKEnvironmentResource pattern.
     /// </summary>
     public static IResourceBuilder<ScalewayEnvironmentResource> AddScalewayEnvironment(
         this IDistributedApplicationBuilder builder,
@@ -31,7 +29,7 @@ public static class ScalewayEnvironmentExtensions
     }
 
     /// <summary>
-    /// Sets a maximum monthly budget in EUR. Deployments that exceed this budget are blocked during dry-run.
+    ///     Sets a maximum monthly budget in EUR. Deployments that exceed this budget are blocked during dry-run.
     /// </summary>
     public static IResourceBuilder<ScalewayEnvironmentResource> WithMonthlyBudget(
         this IResourceBuilder<ScalewayEnvironmentResource> builder,
