@@ -1,3 +1,5 @@
+using Aspire.Hosting.Pipelines;
+
 namespace Aspire.Hosting.Scaleway;
 
 public static class ScalewayEnvironmentExtensions
@@ -25,7 +27,15 @@ public static class ScalewayEnvironmentExtensions
 
         var isPublishMode = builder.ExecutionContext.IsPublishMode;
         var resource = new ScalewayEnvironmentResource(name, config, isPublishMode);
-        return builder.AddResource(resource);
+        var resourceBuilder = builder.AddResource(resource);
+
+        resourceBuilder.WithPipelineStepFactory(
+            ScalewayPipelineStep.StepNameFor(resource),
+            context => ScalewayPipelineStep.ExecuteAsync(resource, context),
+            requiredBy: [WellKnownPipelineSteps.Deploy]
+        );
+
+        return resourceBuilder;
     }
 
     /// <summary>

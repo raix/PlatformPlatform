@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
 using AppHost;
+using Aspire.Hosting.Scaleway;
 using Aspire.Hosting.Scaleway.LocalDev;
+using Aspire.Hosting.Scaleway.Provisioning;
 using Aspire.Hosting.Scaleway.Storage;
 using Projects;
 
@@ -19,15 +21,25 @@ var (googleOAuthConfigured, googleOAuthClientId, googleOAuthClientSecret) = Conf
 var (stripeConfigured, stripePublishableKey, stripeApiKey, stripeWebhookSecret) = ConfigureStripeParameters();
 var stripeFullyConfigured = stripeConfigured && builder.Configuration["Parameters:stripe-webhook-secret"] is not null and not "not-configured";
 
+builder.AddScalewayEnvironment("scaleway", ScalewayRegion.FrPar);
+
 var postgres = builder.AddScalewayRdbInstance("postgres")
     .RunAsPostgresContainer(c => c
         .WithDataVolume("platform-platform-postgres-data")
         .WithLifetime(ContainerLifetime.Persistent)
         .WithArgs("-c", "wal_level=logical")
+    )
+    .PublishAsScalewayRdb(c =>
+        {
+            c.Engine = "PostgreSQL-16";
+            c.NodeType = "DB-DEV-S";
+            c.VolumeSizeInGb = 10;
+        }
     );
 
 var objectStorage = builder.AddScalewayObjectStorage("object-storage")
-    .RunAsSeaweedFsContainer(8333);
+    .RunAsSeaweedFsContainer(8333)
+    .PublishAsScalewayObjectStorage();
 
 builder.AddScalewayTemDomain("mail-server")
     .RunAsMailpitContainer(9003, 9004);
@@ -42,7 +54,14 @@ var accountWorkers = builder
     .AddProject<Account_Workers>("account-workers")
     .WithReference(accountDatabase)
     .WithS3Storage(objectStorage)
-    .WaitFor(accountDatabase);
+    .WaitFor(accountDatabase)
+    .PublishAsScalewayContainer(c =>
+        {
+            c.MemoryLimitMb = 512;
+            c.MinScale = 1;
+            c.MaxScale = 5;
+        }
+    );
 
 var accountApi = builder
     .AddProject<Account_Api>("account-api")
@@ -57,7 +76,14 @@ var accountApi = builder
     .WithEnvironment("Stripe__WebhookSecret", stripeWebhookSecret)
     .WithEnvironment("Stripe__PublishableKey", stripePublishableKey)
     .WithEnvironment("Stripe__AllowMockProvider", "true")
-    .WaitFor(accountWorkers);
+    .WaitFor(accountWorkers)
+    .PublishAsScalewayContainer(c =>
+        {
+            c.MemoryLimitMb = 512;
+            c.MinScale = 1;
+            c.MaxScale = 10;
+        }
+    );
 
 var backOfficeDatabase = postgres.AddDatabase("back-office-database", "back-office");
 
@@ -65,14 +91,28 @@ var backOfficeWorkers = builder
     .AddProject<BackOffice_Workers>("back-office-workers")
     .WithReference(backOfficeDatabase)
     .WithS3Storage(objectStorage)
-    .WaitFor(backOfficeDatabase);
+    .WaitFor(backOfficeDatabase)
+    .PublishAsScalewayContainer(c =>
+        {
+            c.MemoryLimitMb = 512;
+            c.MinScale = 1;
+            c.MaxScale = 5;
+        }
+    );
 
 var backOfficeApi = builder
     .AddProject<BackOffice_Api>("back-office-api")
     .WithUrlConfiguration("/back-office")
     .WithReference(backOfficeDatabase)
     .WithS3Storage(objectStorage)
-    .WaitFor(backOfficeWorkers);
+    .WaitFor(backOfficeWorkers)
+    .PublishAsScalewayContainer(c =>
+        {
+            c.MemoryLimitMb = 512;
+            c.MinScale = 1;
+            c.MaxScale = 10;
+        }
+    );
 
 var mainDatabase = postgres.AddDatabase("main-database", "main");
 
@@ -80,7 +120,14 @@ var mainWorkers = builder
     .AddProject<Main_Workers>("main-workers")
     .WithReference(mainDatabase)
     .WithS3Storage(objectStorage)
-    .WaitFor(mainDatabase);
+    .WaitFor(mainDatabase)
+    .PublishAsScalewayContainer(c =>
+        {
+            c.MemoryLimitMb = 512;
+            c.MinScale = 1;
+            c.MaxScale = 5;
+        }
+    );
 
 var mainApi = builder
     .AddProject<Main_Api>("main-api")
@@ -89,7 +136,14 @@ var mainApi = builder
     .WithS3Storage(objectStorage)
     .WithEnvironment("PUBLIC_GOOGLE_OAUTH_ENABLED", googleOAuthConfigured ? "true" : "false")
     .WithEnvironment("PUBLIC_SUBSCRIPTION_ENABLED", stripeFullyConfigured ? "true" : "false")
-    .WaitFor(mainWorkers);
+    .WaitFor(mainWorkers)
+    .PublishAsScalewayContainer(c =>
+        {
+            c.MemoryLimitMb = 512;
+            c.MinScale = 1;
+            c.MaxScale = 10;
+        }
+    );
 
 var appGateway = builder
     .AddProject<AppGateway>("app-gateway")
@@ -99,7 +153,14 @@ var appGateway = builder
     .WithReference(mainApi)
     .WaitFor(accountApi)
     .WaitFor(frontendBuild)
-    .WithUrlForEndpoint("https", url => url.DisplayText = "Web App");
+    .WithUrlForEndpoint("https", url => url.DisplayText = "Web App")
+    .PublishAsScalewayContainer(c =>
+        {
+            c.MemoryLimitMb = 512;
+            c.MinScale = 1;
+            c.MaxScale = 10;
+        }
+    );
 
 appGateway.WithUrl($"{appGateway.GetEndpoint("https")}/back-office", "Back Office");
 appGateway.WithUrl($"{appGateway.GetEndpoint("https")}/openapi", "Open API");

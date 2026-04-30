@@ -13,13 +13,13 @@ public sealed class PublishAsScalewayContainerAnnotation : IScalewayPublishTarge
 /// </summary>
 public sealed class ScalewayContainerPublishConfig
 {
-    public long MemoryLimitMb { get; init; } = 256;
+    public long MemoryLimitMb { get; set; } = 256;
 
     public long CpuLimitMillicores { get; init; } = 140;
 
-    public int MinScale { get; init; }
+    public int MinScale { get; set; }
 
-    public int MaxScale { get; init; } = 20;
+    public int MaxScale { get; set; } = 20;
 
     public int MaxConcurrency { get; set; } = 50;
 

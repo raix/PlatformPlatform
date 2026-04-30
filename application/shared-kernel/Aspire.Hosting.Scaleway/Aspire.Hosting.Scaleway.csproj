@@ -8,6 +8,7 @@
         <IsAspireSharedProject>true</IsAspireSharedProject>
         <AssemblyName>Aspire.Hosting.Scaleway</AssemblyName>
         <RootNamespace>Aspire.Hosting.Scaleway</RootNamespace>
+        <NoWarn>$(NoWarn);ASPIREPIPELINES001</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
