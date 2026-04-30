@@ -22,7 +22,7 @@ internal static class AppHostRunner
             FileName = "aspire",
             ArgumentList =
             {
-                "do", "deploy",
+                "deploy",
                 "--apphost", appHostProject,
                 "--non-interactive",
                 "--include-exception-details",
