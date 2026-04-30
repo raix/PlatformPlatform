@@ -37,15 +37,15 @@ public static class ScalewayRdbLocalExtensions
     {
         var innerAnnotation = builder.Resource.Annotations.OfType<InnerPostgresAnnotation>().FirstOrDefault();
 
-        if (innerAnnotation is not null)
+        if (innerAnnotation is null)
         {
-            return innerAnnotation.InnerBuilder.AddDatabase(name, databaseName);
+            // Publish mode without RunAsPostgresContainer: create the placeholder Postgres resource on first
+            // call and cache it via InnerPostgresAnnotation so subsequent AddDatabase calls reuse the same parent.
+            var placeholder = builder.ApplicationBuilder.AddPostgres($"{builder.Resource.Name}-placeholder");
+            innerAnnotation = new InnerPostgresAnnotation(placeholder);
+            builder.WithAnnotation(innerAnnotation);
         }
 
-        // Publish mode: create a standalone database resource
-        // The connection string will be resolved by the provisioner
-        return builder.ApplicationBuilder
-            .AddPostgres($"{builder.Resource.Name}-placeholder")
-            .AddDatabase(name, databaseName);
+        return innerAnnotation.InnerBuilder.AddDatabase(name, databaseName);
     }
 }
