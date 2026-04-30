@@ -278,3 +278,26 @@ This fetches `types.gen.ts` from `scaleway/scaleway-sdk-js` on GitHub, parses `C
 | `SENDER_EMAIL_ADDRESS` | From address for emails |
 | `COCKPIT_TOKEN` | Scaleway Cockpit push token |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry collector endpoint |
+
+## Testing
+
+### Unit tests
+
+Run via `pp test --backend`. Standard xUnit, fast.
+
+### End-to-end deploy tests
+
+The package ships subprocess E2E tests that spawn `aspire deploy` against a per-test mock Scaleway server. They live in `Aspire.Hosting.Scaleway.Tests/E2E/` and are tagged `[Trait("Category", "E2E")]`.
+
+- **Run only the E2E suite:** `pp test --backend --filter "Category=E2E"`
+- **Skip the E2E suite:** `pp test --backend --filter "Category!=E2E"`
+
+Each test boots its own `ScalewayMockServer` on an OS-assigned port, sets `SCW_API_URL` to that server, and spawns `aspire deploy --apphost application/AppHost/AppHost.csproj` as a subprocess. Per-test isolation makes them safe to run with the rest of the suite, but each subprocess is heavy (~2s of MSBuild + AppHost startup), so the test project's `xunit.runner.json` caps `maxParallelThreads` at `3` and the E2E tests share a `[Collection("E2E")]` so they run sequentially within that lane.
+
+To override the parallelism cap for a single run (e.g. force serial execution while debugging):
+
+```bash
+dotnet test --settings <(echo '<RunSettings><RunConfiguration><MaxCpuCount>1</MaxCpuCount></RunConfiguration></RunSettings>')
+```
+
+Or edit `xunit.runner.json` locally — the file isn't shipped to consumers.

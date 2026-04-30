@@ -6,8 +6,11 @@ namespace Aspire.Hosting.Scaleway.Tests.E2E;
 /// <summary>
 ///     End-to-end tests that spawn <c>aspire deploy</c> as a subprocess against a per-test
 ///     Scaleway mock server. Tagged with Category=E2E so they can be excluded from fast runs.
+///     Placed in the E2E collection so all scenarios run sequentially (each one starts its own
+///     AppHost subprocess; concurrent subprocesses would compete for memory and MSBuild locks).
 /// </summary>
 [Trait("Category", "E2E")]
+[Collection("E2E")]
 public sealed class DeployScenarioTests
 {
     [Fact]
