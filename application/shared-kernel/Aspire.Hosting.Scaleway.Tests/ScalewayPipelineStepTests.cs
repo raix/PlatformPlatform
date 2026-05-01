@@ -244,7 +244,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
         var rdb = CreateRdbResource("my-db", new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" });
 
         var approver = new ScriptedApprover([DeployApproverDecision.Skip]);
-        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], approver, CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], CancellationToken.None, approver);
 
         _mockServer.Resources.Should().NotContainKey("instances", "the rdb POST should be skipped when approver returns Skip");
     }
@@ -258,7 +258,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
 
         var approver = new ScriptedApprover([DeployApproverDecision.Apply, DeployApproverDecision.Abort]);
 
-        var act = async () => await ScalewayDeploymentStep.DeployAsync(environment, [rdb, rdb2], approver, CancellationToken.None);
+        var act = async () => await ScalewayDeploymentStep.DeployAsync(environment, [rdb, rdb2], CancellationToken.None, approver);
 
         await act.Should().ThrowAsync<DistributedApplicationException>()
             .Where(ex => ex.Message.Contains("aborted") && ex.Message.Contains("'second-db'"));

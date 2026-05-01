@@ -13,37 +13,21 @@ public static class ScalewayDeploymentStep
     public static async Task DeployAsync(
         ScalewayEnvironmentResource environment,
         IEnumerable<IResource> resources,
-        CancellationToken cancellationToken)
-    {
-        await DeployAsync(environment, resources, new AutoApprover(), cancellationToken);
-    }
-
-    public static async Task DeployAsync(
-        ScalewayEnvironmentResource environment,
-        IEnumerable<IResource> resources,
-        IDeployApprover approver,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IDeployApprover? approver = null)
     {
         using var apiClient = new ScalewayApiClient(environment.CredentialConfig);
-        await DeployAsync(environment, resources, apiClient, approver, cancellationToken);
+        await DeployAsync(environment, resources, apiClient, cancellationToken, approver);
     }
 
     internal static async Task DeployAsync(
         ScalewayEnvironmentResource environment,
         IEnumerable<IResource> resources,
         ScalewayApiClient apiClient,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IDeployApprover? approver = null)
     {
-        await DeployAsync(environment, resources, apiClient, new AutoApprover(), cancellationToken);
-    }
-
-    internal static async Task DeployAsync(
-        ScalewayEnvironmentResource environment,
-        IEnumerable<IResource> resources,
-        ScalewayApiClient apiClient,
-        IDeployApprover approver,
-        CancellationToken cancellationToken)
-    {
+        approver ??= new AutoApprover();
         var region = environment.CredentialConfig.DefaultRegion.ToApiString();
         var projectId = environment.CredentialConfig.DefaultProjectId!;
 

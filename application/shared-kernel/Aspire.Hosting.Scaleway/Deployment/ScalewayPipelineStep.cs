@@ -77,7 +77,7 @@ internal static class ScalewayPipelineStep
         }
 
         var approver = SelectApprover();
-        await ScalewayDeploymentStep.DeployAsync(environment, publishResources, apiClient, approver, cancellationToken);
+        await ScalewayDeploymentStep.DeployAsync(environment, publishResources, apiClient, cancellationToken, approver);
     }
 
     /// <summary>
