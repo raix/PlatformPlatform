@@ -72,7 +72,7 @@ public sealed class DeploymentPlanner
         return new DeploymentChange(resourceName, DeploymentChangeType.Delete, DeploymentChangeSeverity.Safe, $"Delete {resourceType} '{resourceName}'");
     }
 
-    public List<DeploymentChange> PlanUpdate(string resourceName, string resourceType, Dictionary<string, (string? Current, string? Desired)> fieldChanges)
+    public DeploymentChange[] PlanUpdate(string resourceName, string resourceType, Dictionary<string, (string? Current, string? Desired)> fieldChanges)
     {
         var changes = new List<DeploymentChange>();
         var immutable = ImmutableFields.GetValueOrDefault(resourceType, []);
@@ -99,13 +99,13 @@ public sealed class DeploymentPlanner
             }
         }
 
-        return changes;
+        return changes.ToArray();
     }
 
     /// <summary>
     ///     Compares a desired RDB config against an existing Scaleway RDB instance and returns planned changes.
     /// </summary>
-    public List<DeploymentChange> PlanRdbUpdate(string resourceName, ScalewayRdbPublishConfig desired, JsonElement existing)
+    public DeploymentChange[] PlanRdbUpdate(string resourceName, ScalewayRdbPublishConfig desired, JsonElement existing)
     {
         var changes = new Dictionary<string, (string? Current, string? Desired)>();
 
@@ -120,7 +120,7 @@ public sealed class DeploymentPlanner
     /// <summary>
     ///     Compares a desired Redis config against an existing Scaleway Redis cluster and returns planned changes.
     /// </summary>
-    public List<DeploymentChange> PlanRedisUpdate(string resourceName, ScalewayRedisPublishConfig desired, JsonElement existing)
+    public DeploymentChange[] PlanRedisUpdate(string resourceName, ScalewayRedisPublishConfig desired, JsonElement existing)
     {
         var changes = new Dictionary<string, (string? Current, string? Desired)>();
 

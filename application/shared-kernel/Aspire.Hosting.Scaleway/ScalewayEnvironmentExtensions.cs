@@ -15,15 +15,7 @@ public static class ScalewayEnvironmentExtensions
         ScalewayRegion? region = null,
         string? projectId = null)
     {
-        var config = new ScalewayCredentialConfig
-        {
-            AccessKey = Environment.GetEnvironmentVariable("SCW_ACCESS_KEY"),
-            SecretKey = Environment.GetEnvironmentVariable("SCW_SECRET_KEY"),
-            DefaultProjectId = projectId ?? Environment.GetEnvironmentVariable("SCW_DEFAULT_PROJECT_ID"),
-            DefaultOrganizationId = Environment.GetEnvironmentVariable("SCW_DEFAULT_ORGANIZATION_ID"),
-            DefaultRegion = region ?? ScalewayRegion.FrPar,
-            ApiUrl = Environment.GetEnvironmentVariable("SCW_API_URL") ?? "https://api.scaleway.com"
-        };
+        var config = ScalewayCredentialConfig.FromEnvironment(defaultProjectId: projectId, defaultRegion: region);
 
         var isPublishMode = builder.ExecutionContext.IsPublishMode;
         var resource = new ScalewayEnvironmentResource(name, config, isPublishMode);

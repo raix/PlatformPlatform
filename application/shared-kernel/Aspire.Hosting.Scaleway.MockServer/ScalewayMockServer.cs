@@ -117,11 +117,17 @@ public sealed class ScalewayMockServer : IDisposable
         );
     }
 
-    public string Url => _app.Urls.First();
+    public string Url => _app.Urls.FirstOrDefault()
+                         ?? throw new InvalidOperationException("Mock server URL is not available — call Start() first.");
 
     public IReadOnlyList<RecordedRequest> ReceivedRequests => [.. _requests];
 
-    public IReadOnlyDictionary<string, List<JsonElement>> Resources => _resources;
+    /// <summary>
+    ///     Snapshot of the current resource store. Both the dictionary and the inner lists are copies,
+    ///     so callers reading mid-request never race the writer.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<JsonElement>> Resources =>
+        _resources.ToDictionary(kvp => kvp.Key, kvp => (IReadOnlyList<JsonElement>)kvp.Value.ToArray());
 
     public void Dispose()
     {

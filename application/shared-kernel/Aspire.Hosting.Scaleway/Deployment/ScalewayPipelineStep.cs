@@ -98,12 +98,13 @@ internal static class ScalewayPipelineStep
 
     /// <summary>
     ///     Selects an interactive approver only when explicitly opted in and a real terminal is
-    ///     attached. CI subprocesses (no TTY) silently fall back to <see cref="AutoApprover" />.
+    ///     attached on both stdin and stdout. CI subprocesses (any redirection) silently fall back
+    ///     to <see cref="AutoApprover" />.
     /// </summary>
     internal static IDeployApprover SelectApprover()
     {
         var optIn = Environment.GetEnvironmentVariable("SCALEWAY_DEPLOY_INTERACTIVE") == "1";
-        if (optIn && !Console.IsInputRedirected)
+        if (optIn && !Console.IsInputRedirected && !Console.IsOutputRedirected)
         {
             return new InteractiveConsoleApprover();
         }

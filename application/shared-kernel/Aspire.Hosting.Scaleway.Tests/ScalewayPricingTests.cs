@@ -256,6 +256,27 @@ public sealed class ScalewayPricingTests
     }
 
     [Fact]
+    public async Task DiskCache_CorruptFile_FallsBackToNetworkFetch()
+    {
+        var tempDir = CreateTempCacheDirectory();
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(tempDir, "scaleway-pricing-cache-fr-par.json"), "this is not json {");
+
+            var httpClient = CreateMockCatalogClient([CreateCatalogProduct("DB-DEV-S", 0.012m)]);
+            using var pricing = new ScalewayPricingClient(httpClient, tempDir, false);
+
+            var estimate = await pricing.EstimateRdbCostAsync(new ScalewayRdbPublishConfig { NodeType = "DB-DEV-S", Region = ScalewayRegion.FrPar });
+
+            estimate.MonthlyPrice.Should().Be(0.012m * 730m, "a corrupt cache file must not break the deploy — fail-soft and refresh from network");
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
     public async Task DiskCache_Disabled_DoesNotReadOrWrite()
     {
         var tempDir = CreateTempCacheDirectory();

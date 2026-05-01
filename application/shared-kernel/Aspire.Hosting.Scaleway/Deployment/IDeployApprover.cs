@@ -42,10 +42,13 @@ internal sealed class InteractiveConsoleApprover : IDeployApprover
 {
     public Task<DeployApproverDecision> ApproveAsync(string resourceName, string resourceType, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         Console.WriteLine();
         Console.WriteLine($"Next change: {resourceType} '{resourceName}'");
         Console.Write("[a]pply / [s]kip / [q]uit > ");
 
+        // Console.ReadLine() blocks; mid-prompt cancellation falls through to process termination.
         var line = Console.ReadLine();
         var decision = line?.Trim().ToLowerInvariant() switch
         {

@@ -47,13 +47,11 @@ public static class ScalewayDeploymentStep
         var region = environment.CredentialConfig.DefaultRegion.ToApiString();
         var projectId = environment.CredentialConfig.DefaultProjectId!;
 
-        // Step 1: Create shared infrastructure. The registry namespace is provisioned for image
-        // pushes but its ID is not needed downstream — containers use the container namespace.
-        // Shared infra is auto-applied; the approver only gates app-level resources.
+        // Shared infrastructure is auto-applied (no approver gate). The registry namespace's id
+        // isn't consumed downstream — containers live in the container namespace, not this one.
         var privateNetwork = await ProvisionPrivateNetworkAsync(apiClient, region, projectId, environment.DefaultsProvider.PrivateNetwork, cancellationToken);
         await ProvisionRegistryNamespaceAsync(apiClient, region, projectId, environment.DefaultsProvider.Registry, cancellationToken);
 
-        // Step 2: Provision each resource with a publish annotation, gated through the approver.
         foreach (var resource in resources)
         {
             var publishAnnotation = resource.Annotations.OfType<IScalewayPublishTargetAnnotation>().FirstOrDefault();
@@ -207,7 +205,6 @@ public static class ScalewayDeploymentStep
         string privateNetworkId,
         CancellationToken cancellationToken)
     {
-        // Find or create the container namespace
         var namespaceId = await FindOrCreateContainerNamespaceAsync(apiClient, region, projectId, config, cancellationToken);
 
         var existing = await FindByNameAsync(apiClient, $"containers/v1beta1/regions/{region}/containers", region, projectId, resourceName, cancellationToken);
@@ -273,7 +270,7 @@ public static class ScalewayDeploymentStep
     ///     Performs a dry run: compares desired state against actual Scaleway resources and returns a plan
     ///     without making any changes. Uses the DeploymentPlanner for safety classification.
     /// </summary>
-    internal static async Task<List<DeploymentChange>> DryRunAsync(
+    internal static async Task<DeploymentChange[]> DryRunAsync(
         ScalewayEnvironmentResource environment,
         IEnumerable<IResource> resources,
         ScalewayApiClient apiClient,
@@ -284,14 +281,12 @@ public static class ScalewayDeploymentStep
         var planner = new DeploymentPlanner();
         var changes = new List<DeploymentChange>();
 
-        // Check shared infrastructure
         var existingNetwork = await FindByNameAsync(apiClient, $"vpc/v2/regions/{region}/private-networks", region, projectId, environment.DefaultsProvider.PrivateNetwork.Name, cancellationToken);
         changes.Add(existingNetwork is not null ? planner.PlanNoChange(environment.DefaultsProvider.PrivateNetwork.Name, "private-network") : planner.PlanCreate(environment.DefaultsProvider.PrivateNetwork.Name, "private-network"));
 
         var existingRegistry = await FindByNameAsync(apiClient, $"registry/v1/regions/{region}/namespaces", region, projectId, environment.DefaultsProvider.Registry.Name, cancellationToken);
         changes.Add(existingRegistry is not null ? planner.PlanNoChange(environment.DefaultsProvider.Registry.Name, "registry") : planner.PlanCreate(environment.DefaultsProvider.Registry.Name, "registry"));
 
-        // Check each resource with a publish annotation
         foreach (var resource in resources)
         {
             var annotation = resource.Annotations.OfType<IScalewayPublishTargetAnnotation>().FirstOrDefault();
@@ -311,7 +306,7 @@ public static class ScalewayDeploymentStep
                     else
                     {
                         var updateChanges = planner.PlanRdbUpdate(resource.Name, rdbAnnotation.Config, existingRdb.Value);
-                        if (updateChanges.Count > 0)
+                        if (updateChanges.Length > 0)
                         {
                             changes.AddRange(updateChanges);
                         }
@@ -333,7 +328,7 @@ public static class ScalewayDeploymentStep
                     else
                     {
                         var updateChanges = planner.PlanRedisUpdate(resource.Name, redisAnnotation.Config, existingRedis.Value);
-                        if (updateChanges.Count > 0)
+                        if (updateChanges.Length > 0)
                         {
                             changes.AddRange(updateChanges);
                         }
@@ -352,6 +347,6 @@ public static class ScalewayDeploymentStep
             }
         }
 
-        return changes;
+        return changes.ToArray();
     }
 }

@@ -10,7 +10,7 @@ namespace DeveloperCli.Commands;
 ///     Spawns <c>dotnet run</c> on the mock server project; the user points
 ///     <c>aspire deploy</c> at the printed URL from another terminal.
 /// </summary>
-public class ScalewayMockCommand : Command
+public sealed class ScalewayMockCommand : Command
 {
     public ScalewayMockCommand() : base("scaleway-mock", "Run an in-memory mock Scaleway API server for local interactive QA of aspire deploy")
     {

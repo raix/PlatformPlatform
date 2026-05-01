@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 
@@ -84,9 +85,13 @@ internal static class AppHostRunner
             {
                 process.Kill(true);
             }
-            catch
+            catch (InvalidOperationException)
             {
-                /* best-effort */
+                // Process already exited between WaitForExit and Kill — nothing to do.
+            }
+            catch (Win32Exception)
+            {
+                // OS refused the kill (process gone, permission, etc.) — best-effort, surface the timeout instead.
             }
 
             throw new TimeoutException($"aspire deploy did not complete within {processTimeout}.\nStdout:\n{stdout}\nStderr:\n{stderr}");

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 
@@ -18,7 +19,7 @@ public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDi
     private readonly string _cacheDirectory = cacheDirectory ?? DefaultCacheDirectory();
     private readonly bool _cacheDisabled = cacheDisabled ?? Environment.GetEnvironmentVariable("SCW_PRICING_CACHE_DISABLED") == "1";
 
-    private readonly Dictionary<string, Dictionary<string, CatalogProduct>> _inMemoryCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, Dictionary<string, CatalogProduct>> _inMemoryCache = new(StringComparer.OrdinalIgnoreCase);
 
     public ScalewayPricingClient() : this(new HttpClient { BaseAddress = new Uri(ResolveBaseUrl()) })
     {

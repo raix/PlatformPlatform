@@ -21,18 +21,15 @@ public sealed class SmtpEmailClient(ILogger<SmtpEmailClient> logger) : IEmailCli
 
     public async Task SendAsync(string recipient, string subject, string htmlContent, CancellationToken cancellationToken)
     {
-        var smtpClient = new SmtpClient(_smtpHost, _smtpPort)
-        {
-            EnableSsl = true,
-            Credentials = _smtpUsername is not null ? new NetworkCredential(_smtpUsername, _smtpPassword) : null
-        };
-        using (smtpClient)
-        {
-            var mailMessage = new MailMessage(_senderEmail, recipient, subject, htmlContent) { IsBodyHtml = true };
+        using var smtpClient = new SmtpClient(_smtpHost, _smtpPort);
+        smtpClient.EnableSsl = true;
+        smtpClient.Credentials = _smtpUsername is not null ? new NetworkCredential(_smtpUsername, _smtpPassword) : null;
 
-            logger.LogInformation("Sending email to {Recipient} with subject {Subject}", recipient, subject);
+        using var mailMessage = new MailMessage(_senderEmail, recipient, subject, htmlContent);
+        mailMessage.IsBodyHtml = true;
 
-            await smtpClient.SendMailAsync(mailMessage, cancellationToken);
-        }
+        logger.LogInformation("Sending email to {Recipient} with subject {Subject}", recipient, subject);
+
+        await smtpClient.SendMailAsync(mailMessage, cancellationToken);
     }
 }
