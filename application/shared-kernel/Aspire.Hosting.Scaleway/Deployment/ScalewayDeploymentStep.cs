@@ -13,19 +13,19 @@ public static class ScalewayDeploymentStep
     public static async Task DeployAsync(
         ScalewayEnvironmentResource environment,
         IEnumerable<IResource> resources,
-        CancellationToken cancellationToken,
-        IDeployApprover? approver = null)
+        IDeployApprover? approver = null,
+        CancellationToken cancellationToken = default)
     {
         using var apiClient = new ScalewayApiClient(environment.CredentialConfig);
-        await DeployAsync(environment, resources, apiClient, cancellationToken, approver);
+        await DeployAsync(environment, resources, apiClient, approver, cancellationToken);
     }
 
     internal static async Task DeployAsync(
         ScalewayEnvironmentResource environment,
         IEnumerable<IResource> resources,
         ScalewayApiClient apiClient,
-        CancellationToken cancellationToken,
-        IDeployApprover? approver = null)
+        IDeployApprover? approver = null,
+        CancellationToken cancellationToken = default)
     {
         approver ??= new AutoApprover();
         var region = environment.CredentialConfig.DefaultRegion.ToApiString();
@@ -46,9 +46,9 @@ public static class ScalewayDeploymentStep
 
             var resourceType = publishAnnotation switch
             {
-                PublishAsScalewayRdbAnnotation => "rdb",
-                PublishAsScalewayRedisAnnotation => "redis",
-                PublishAsScalewayContainerAnnotation => "container",
+                PublishAsScalewayRdbAnnotation => ScalewayResourceTypes.Rdb,
+                PublishAsScalewayRedisAnnotation => ScalewayResourceTypes.Redis,
+                PublishAsScalewayContainerAnnotation => ScalewayResourceTypes.Container,
                 _ => publishAnnotation.GetType().Name
             };
 
@@ -258,75 +258,78 @@ public static class ScalewayDeploymentStep
         ScalewayEnvironmentResource environment,
         IEnumerable<IResource> resources,
         ScalewayApiClient apiClient,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var region = environment.CredentialConfig.DefaultRegion.ToApiString();
         var projectId = environment.CredentialConfig.DefaultProjectId!;
         var planner = new DeploymentPlanner();
-        var changes = new List<DeploymentChange>();
 
-        var existingNetwork = await FindByNameAsync(apiClient, $"vpc/v2/regions/{region}/private-networks", region, projectId, environment.DefaultsProvider.PrivateNetwork.Name, cancellationToken);
-        changes.Add(existingNetwork is not null ? planner.PlanNoChange(environment.DefaultsProvider.PrivateNetwork.Name, "private-network") : planner.PlanCreate(environment.DefaultsProvider.PrivateNetwork.Name, "private-network"));
+        // Fan out all lookups concurrently — they're independent reads against different endpoints.
+        var networkLookup = FindByNameAsync(apiClient, $"vpc/v2/regions/{region}/private-networks", region, projectId, environment.DefaultsProvider.PrivateNetwork.Name, cancellationToken);
+        var registryLookup = FindByNameAsync(apiClient, $"registry/v1/regions/{region}/namespaces", region, projectId, environment.DefaultsProvider.Registry.Name, cancellationToken);
 
-        var existingRegistry = await FindByNameAsync(apiClient, $"registry/v1/regions/{region}/namespaces", region, projectId, environment.DefaultsProvider.Registry.Name, cancellationToken);
-        changes.Add(existingRegistry is not null ? planner.PlanNoChange(environment.DefaultsProvider.Registry.Name, "registry") : planner.PlanCreate(environment.DefaultsProvider.Registry.Name, "registry"));
-
+        var resourceLookups = new List<(IResource Resource, IScalewayPublishTargetAnnotation Annotation, Task<JsonElement?> Lookup)>();
         foreach (var resource in resources)
         {
             var annotation = resource.Annotations.OfType<IScalewayPublishTargetAnnotation>().FirstOrDefault();
-            if (annotation is null)
-            {
-                continue;
-            }
+            if (annotation is null) continue;
 
+            var lookup = annotation switch
+            {
+                PublishAsScalewayRdbAnnotation => FindByNameAsync(apiClient, $"rdb/v1/regions/{region}/instances", region, projectId, resource.Name, cancellationToken),
+                PublishAsScalewayRedisAnnotation redisAnnotation => FindByNameAsync(apiClient, $"redis/v1/zones/{redisAnnotation.Config.Zone.ToApiString()}/clusters", redisAnnotation.Config.Zone.ToApiString(), projectId, resource.Name, cancellationToken),
+                PublishAsScalewayContainerAnnotation => FindByNameAsync(apiClient, $"containers/v1beta1/regions/{region}/containers", region, projectId, resource.Name, cancellationToken),
+                _ => Task.FromResult<JsonElement?>(null)
+            };
+
+            resourceLookups.Add((resource, annotation, lookup));
+        }
+
+        await Task.WhenAll([networkLookup, registryLookup, .. resourceLookups.Select(l => l.Lookup)]);
+
+        var changes = new List<DeploymentChange>
+        {
+            networkLookup.Result is not null
+                ? planner.PlanNoChange(environment.DefaultsProvider.PrivateNetwork.Name, ScalewayResourceTypes.PrivateNetwork)
+                : planner.PlanCreate(environment.DefaultsProvider.PrivateNetwork.Name, ScalewayResourceTypes.PrivateNetwork),
+            registryLookup.Result is not null
+                ? planner.PlanNoChange(environment.DefaultsProvider.Registry.Name, ScalewayResourceTypes.Registry)
+                : planner.PlanCreate(environment.DefaultsProvider.Registry.Name, ScalewayResourceTypes.Registry)
+        };
+
+        foreach (var (resource, annotation, lookup) in resourceLookups)
+        {
+            var existing = lookup.Result;
             switch (annotation)
             {
                 case PublishAsScalewayRdbAnnotation rdbAnnotation:
-                    var existingRdb = await FindByNameAsync(apiClient, $"rdb/v1/regions/{region}/instances", region, projectId, resource.Name, cancellationToken);
-                    if (existingRdb is null)
+                    if (existing is null)
                     {
-                        changes.Add(planner.PlanCreate(resource.Name, "rdb"));
+                        changes.Add(planner.PlanCreate(resource.Name, ScalewayResourceTypes.Rdb));
                     }
                     else
                     {
-                        var updateChanges = planner.PlanRdbUpdate(resource.Name, rdbAnnotation.Config, existingRdb.Value);
-                        if (updateChanges.Length > 0)
-                        {
-                            changes.AddRange(updateChanges);
-                        }
-                        else
-                        {
-                            changes.Add(planner.PlanNoChange(resource.Name, "rdb"));
-                        }
+                        var updateChanges = planner.PlanRdbUpdate(resource.Name, rdbAnnotation.Config, existing.Value);
+                        changes.AddRange(updateChanges.Length > 0 ? updateChanges : [planner.PlanNoChange(resource.Name, ScalewayResourceTypes.Rdb)]);
                     }
 
                     break;
 
                 case PublishAsScalewayRedisAnnotation redisAnnotation:
-                    var zone = redisAnnotation.Config.Zone.ToApiString();
-                    var existingRedis = await FindByNameAsync(apiClient, $"redis/v1/zones/{zone}/clusters", zone, projectId, resource.Name, cancellationToken);
-                    if (existingRedis is null)
+                    if (existing is null)
                     {
-                        changes.Add(planner.PlanCreate(resource.Name, "redis"));
+                        changes.Add(planner.PlanCreate(resource.Name, ScalewayResourceTypes.Redis));
                     }
                     else
                     {
-                        var updateChanges = planner.PlanRedisUpdate(resource.Name, redisAnnotation.Config, existingRedis.Value);
-                        if (updateChanges.Length > 0)
-                        {
-                            changes.AddRange(updateChanges);
-                        }
-                        else
-                        {
-                            changes.Add(planner.PlanNoChange(resource.Name, "redis"));
-                        }
+                        var updateChanges = planner.PlanRedisUpdate(resource.Name, redisAnnotation.Config, existing.Value);
+                        changes.AddRange(updateChanges.Length > 0 ? updateChanges : [planner.PlanNoChange(resource.Name, ScalewayResourceTypes.Redis)]);
                     }
 
                     break;
 
                 case PublishAsScalewayContainerAnnotation:
-                    var existingContainer = await FindByNameAsync(apiClient, $"containers/v1beta1/regions/{region}/containers", region, projectId, resource.Name, cancellationToken);
-                    changes.Add(existingContainer is null ? planner.PlanCreate(resource.Name, "container") : planner.PlanNoChange(resource.Name, "container"));
+                    changes.Add(existing is null ? planner.PlanCreate(resource.Name, ScalewayResourceTypes.Container) : planner.PlanNoChange(resource.Name, ScalewayResourceTypes.Container));
                     break;
             }
         }

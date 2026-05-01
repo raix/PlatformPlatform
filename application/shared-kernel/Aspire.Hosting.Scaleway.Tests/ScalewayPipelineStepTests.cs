@@ -218,7 +218,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
     [Fact]
     public void SelectApprover_WhenInteractiveOptInAndStdinIsRedirected_FallsBackToAutoApprover()
     {
-        Environment.SetEnvironmentVariable("SCALEWAY_DEPLOY_INTERACTIVE", "1");
+        Environment.SetEnvironmentVariable("SCW_DEPLOY_INTERACTIVE", "1");
         try
         {
             // The xUnit runner redirects stdin, so the TTY check fails and we get AutoApprover.
@@ -226,14 +226,14 @@ public sealed class ScalewayPipelineStepTests : IDisposable
         }
         finally
         {
-            Environment.SetEnvironmentVariable("SCALEWAY_DEPLOY_INTERACTIVE", null);
+            Environment.SetEnvironmentVariable("SCW_DEPLOY_INTERACTIVE", null);
         }
     }
 
     [Fact]
     public void SelectApprover_WithoutOptIn_ReturnsAutoApprover()
     {
-        Environment.SetEnvironmentVariable("SCALEWAY_DEPLOY_INTERACTIVE", null);
+        Environment.SetEnvironmentVariable("SCW_DEPLOY_INTERACTIVE", null);
         ScalewayPipelineStep.SelectApprover().Should().BeOfType<AutoApprover>();
     }
 
@@ -244,7 +244,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
         var rdb = CreateRdbResource("my-db", new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" });
 
         var approver = new ScriptedApprover([DeployApproverDecision.Skip]);
-        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], CancellationToken.None, approver);
+        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], approver);
 
         _mockServer.Resources.Should().NotContainKey("instances", "the rdb POST should be skipped when approver returns Skip");
     }
@@ -258,7 +258,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
 
         var approver = new ScriptedApprover([DeployApproverDecision.Apply, DeployApproverDecision.Abort]);
 
-        var act = async () => await ScalewayDeploymentStep.DeployAsync(environment, [rdb, rdb2], CancellationToken.None, approver);
+        var act = async () => await ScalewayDeploymentStep.DeployAsync(environment, [rdb, rdb2], approver);
 
         await act.Should().ThrowAsync<DistributedApplicationException>()
             .Where(ex => ex.Message.Contains("aborted") && ex.Message.Contains("'second-db'"));

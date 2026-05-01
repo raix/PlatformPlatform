@@ -19,6 +19,8 @@ public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDi
     private readonly string _cacheDirectory = cacheDirectory ?? DefaultCacheDirectory();
     private readonly bool _cacheDisabled = cacheDisabled ?? Environment.GetEnvironmentVariable("SCW_PRICING_CACHE_DISABLED") == "1";
 
+    // Process-level cache for the catalog. The disk cache is the cross-process backing store; this
+    // layer earns its keep when SCW_PRICING_CACHE_DISABLED=1 (CI / E2E tests) and the disk path is off.
     private readonly ConcurrentDictionary<string, Dictionary<string, CatalogProduct>> _inMemoryCache = new(StringComparer.OrdinalIgnoreCase);
 
     public ScalewayPricingClient() : this(new HttpClient { BaseAddress = new Uri(ResolveBaseUrl()) })
@@ -41,7 +43,7 @@ public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDi
         var multiplier = config.IsHaCluster ? 2m : 1m;
 
         return new CostEstimate(
-            "rdb",
+            ScalewayResourceTypes.Rdb,
             config.NodeType,
             hourlyRate * monthlyHours * multiplier,
             "EUR",
@@ -59,7 +61,7 @@ public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDi
         var monthlyHours = 730m;
 
         return new CostEstimate(
-            "redis",
+            ScalewayResourceTypes.Redis,
             config.NodeType,
             hourlyRate * monthlyHours * config.ClusterSize,
             "EUR",
@@ -89,7 +91,7 @@ public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDi
         var maxMonthlyCost = (vCpus * vCpuPerSecond + memoryGb * memoryPerGbPerSecond) * secondsPerMonth * config.MaxScale;
 
         return Task.FromResult(new CostEstimate(
-                "container",
+                ScalewayResourceTypes.Container,
                 $"{config.MemoryLimitMb}MB/{config.CpuLimitMillicores}mVCPU",
                 minMonthlyCost,
                 "EUR",

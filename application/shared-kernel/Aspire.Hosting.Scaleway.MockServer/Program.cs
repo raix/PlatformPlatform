@@ -30,7 +30,7 @@ Console.WriteLine();
 Console.WriteLine("Point aspire deploy at it from another terminal:");
 Console.WriteLine($"  export SCW_API_URL={server.Url}");
 Console.WriteLine("  export SCW_ACCESS_KEY=test SCW_SECRET_KEY=test SCW_DEFAULT_PROJECT_ID=test");
-Console.WriteLine("  export SCALEWAY_DEPLOY_INTERACTIVE=1");
+Console.WriteLine("  export SCW_DEPLOY_INTERACTIVE=1");
 Console.WriteLine("  aspire deploy --apphost application/AppHost/AppHost.csproj");
 Console.WriteLine();
 Console.WriteLine("Press Ctrl+C to stop.");

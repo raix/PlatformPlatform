@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Diagnostics;
 using DeveloperCli.Installation;
 using DeveloperCli.Utilities;
 using Spectre.Console;
@@ -44,11 +45,17 @@ public sealed class ScalewayMockCommand : Command
             Environment.Exit(1);
         }
 
-        var arguments = new List<string> { "run", "--project", projectPath, "--" };
+        var processStartInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            WorkingDirectory = Configuration.ApplicationFolder,
+            ArgumentList = { "run", "--project", projectPath, "--" }
+        };
+
         if (port > 0)
         {
-            arguments.Add("--port");
-            arguments.Add(port.ToString());
+            processStartInfo.ArgumentList.Add("--port");
+            processStartInfo.ArgumentList.Add(port.ToString());
         }
 
         if (seedPath is not null)
@@ -60,18 +67,11 @@ public sealed class ScalewayMockCommand : Command
                 Environment.Exit(1);
             }
 
-            arguments.Add("--seed");
-            arguments.Add(resolvedSeed);
+            processStartInfo.ArgumentList.Add("--seed");
+            processStartInfo.ArgumentList.Add(resolvedSeed);
         }
 
-        var command = $"dotnet {string.Join(" ", arguments.Select(QuoteIfNeeded))}";
-
         AnsiConsole.MarkupLine("[blue]Starting Scaleway mock server (Ctrl+C to stop)...[/]");
-        ProcessHelper.StartProcess(command, Configuration.ApplicationFolder);
-    }
-
-    private static string QuoteIfNeeded(string argument)
-    {
-        return argument.Contains(' ') ? $"\"{argument}\"" : argument;
+        ProcessHelper.StartProcess(processStartInfo);
     }
 }

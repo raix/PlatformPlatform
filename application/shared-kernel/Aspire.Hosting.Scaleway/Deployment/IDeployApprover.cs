@@ -22,8 +22,8 @@ public enum DeployApproverDecision
 }
 
 /// <summary>
-///     Default approver: applies every change without prompting. Matches the historical
-///     non-interactive behaviour of <see cref="ScalewayDeploymentStep" />.
+///     Default approver: applies every change without prompting. Used for non-interactive
+///     deploys (CI, production rollouts).
 /// </summary>
 internal sealed class AutoApprover : IDeployApprover
 {

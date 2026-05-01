@@ -7,20 +7,18 @@ using Aspire.Hosting.Scaleway.Provisioning;
 using Aspire.Hosting.Scaleway.Storage;
 using Projects;
 
-// Check for port conflicts before starting (skipped in publish/deploy and during E2E tests)
-if (Environment.GetEnvironmentVariable("APPHOST_SKIP_PORT_CHECK") != "1")
-{
-    CheckPortAvailability();
-}
-
 var builder = DistributedApplication.CreateBuilder(args);
 
-// In publish mode (aspire deploy / aspire publish) the dashboard never runs, so the dev HTTPS
-// certificate is not needed. Skipping its creation avoids a blocking keychain trust prompt on
-// fresh machines and CI runners.
-var certificatePassword = builder.ExecutionContext.IsPublishMode
-    ? string.Empty
-    : await builder.CreateSslCertificateIfNotExists();
+// In publish mode (aspire deploy / aspire publish) the dashboard never runs, so neither the dev
+// HTTPS certificate nor the dashboard ports are needed. Skipping the cert avoids a blocking
+// keychain trust prompt on fresh machines / CI runners; skipping the port check lets parallel
+// E2E test processes coexist.
+var certificatePassword = string.Empty;
+if (!builder.ExecutionContext.IsPublishMode)
+{
+    CheckPortAvailability();
+    certificatePassword = await builder.CreateSslCertificateIfNotExists();
+}
 
 SecretManagerHelper.GenerateAuthenticationTokenSigningKey("authentication-token-signing-key");
 
@@ -63,13 +61,7 @@ var accountWorkers = builder
     .WithReference(accountDatabase)
     .WithS3Storage(objectStorage)
     .WaitFor(accountDatabase)
-    .PublishAsScalewayContainer(c =>
-        {
-            c.MemoryLimitMb = 512;
-            c.MinScale = 1;
-            c.MaxScale = 5;
-        }
-    );
+    .PublishAsStandardScalewayContainer(5);
 
 var accountApi = builder
     .AddProject<Account_Api>("account-api")
@@ -85,13 +77,7 @@ var accountApi = builder
     .WithEnvironment("Stripe__PublishableKey", stripePublishableKey)
     .WithEnvironment("Stripe__AllowMockProvider", "true")
     .WaitFor(accountWorkers)
-    .PublishAsScalewayContainer(c =>
-        {
-            c.MemoryLimitMb = 512;
-            c.MinScale = 1;
-            c.MaxScale = 10;
-        }
-    );
+    .PublishAsStandardScalewayContainer(10);
 
 var backOfficeDatabase = postgres.AddDatabase("back-office-database", "back-office");
 
@@ -100,13 +86,7 @@ var backOfficeWorkers = builder
     .WithReference(backOfficeDatabase)
     .WithS3Storage(objectStorage)
     .WaitFor(backOfficeDatabase)
-    .PublishAsScalewayContainer(c =>
-        {
-            c.MemoryLimitMb = 512;
-            c.MinScale = 1;
-            c.MaxScale = 5;
-        }
-    );
+    .PublishAsStandardScalewayContainer(5);
 
 var backOfficeApi = builder
     .AddProject<BackOffice_Api>("back-office-api")
@@ -114,13 +94,7 @@ var backOfficeApi = builder
     .WithReference(backOfficeDatabase)
     .WithS3Storage(objectStorage)
     .WaitFor(backOfficeWorkers)
-    .PublishAsScalewayContainer(c =>
-        {
-            c.MemoryLimitMb = 512;
-            c.MinScale = 1;
-            c.MaxScale = 10;
-        }
-    );
+    .PublishAsStandardScalewayContainer(10);
 
 var mainDatabase = postgres.AddDatabase("main-database", "main");
 
@@ -129,13 +103,7 @@ var mainWorkers = builder
     .WithReference(mainDatabase)
     .WithS3Storage(objectStorage)
     .WaitFor(mainDatabase)
-    .PublishAsScalewayContainer(c =>
-        {
-            c.MemoryLimitMb = 512;
-            c.MinScale = 1;
-            c.MaxScale = 5;
-        }
-    );
+    .PublishAsStandardScalewayContainer(5);
 
 var mainApi = builder
     .AddProject<Main_Api>("main-api")
@@ -145,13 +113,7 @@ var mainApi = builder
     .WithEnvironment("PUBLIC_GOOGLE_OAUTH_ENABLED", googleOAuthConfigured ? "true" : "false")
     .WithEnvironment("PUBLIC_SUBSCRIPTION_ENABLED", stripeFullyConfigured ? "true" : "false")
     .WaitFor(mainWorkers)
-    .PublishAsScalewayContainer(c =>
-        {
-            c.MemoryLimitMb = 512;
-            c.MinScale = 1;
-            c.MaxScale = 10;
-        }
-    );
+    .PublishAsStandardScalewayContainer(10);
 
 var appGateway = builder
     .AddProject<AppGateway>("app-gateway")
@@ -162,13 +124,7 @@ var appGateway = builder
     .WaitFor(accountApi)
     .WaitFor(frontendBuild)
     .WithUrlForEndpoint("https", url => url.DisplayText = "Web App")
-    .PublishAsScalewayContainer(c =>
-        {
-            c.MemoryLimitMb = 512;
-            c.MinScale = 1;
-            c.MaxScale = 10;
-        }
-    );
+    .PublishAsStandardScalewayContainer(10);
 
 appGateway.WithUrl($"{appGateway.GetEndpoint("https")}/back-office", "Back Office");
 appGateway.WithUrl($"{appGateway.GetEndpoint("https")}/openapi", "Open API");
@@ -301,7 +257,7 @@ void CheckPortAvailability()
 
     if (blocked.Count > 0)
     {
-        Console.WriteLine($"⚠️  Port conflicts: {string.Join(", ", blocked.Select(b => $"{b.Item1} ({b.Item2})"))}");
+        Console.WriteLine($"[WARN] Port conflicts: {string.Join(", ", blocked.Select(b => $"{b.Item1} ({b.Item2})"))}");
         Console.WriteLine("   Services already running. Stop them first using 'run --stop'.");
         Environment.Exit(1);
     }

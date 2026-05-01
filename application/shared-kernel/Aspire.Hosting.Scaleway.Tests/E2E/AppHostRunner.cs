@@ -41,7 +41,6 @@ internal static class AppHostRunner
                 ["SCW_ACCESS_KEY"] = "e2e-access-key",
                 ["SCW_SECRET_KEY"] = "e2e-secret-key",
                 ["SCW_DEFAULT_PROJECT_ID"] = "e2e-project",
-                ["APPHOST_SKIP_PORT_CHECK"] = "1",
                 ["SCW_PRICING_CACHE_DISABLED"] = "1"
             }
         };

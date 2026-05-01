@@ -15,9 +15,9 @@ public sealed class DeploymentPlanner
     /// </summary>
     private static readonly Dictionary<string, HashSet<string>> ImmutableFields = new()
     {
-        ["rdb"] = ["region", "engine"],
-        ["redis"] = ["zone"],
-        ["object-storage"] = ["region"]
+        [ScalewayResourceTypes.Rdb] = ["region", "engine"],
+        [ScalewayResourceTypes.Redis] = ["zone"],
+        [ScalewayResourceTypes.ObjectStorage] = ["region"]
     };
 
     /// <summary>
@@ -26,8 +26,8 @@ public sealed class DeploymentPlanner
     /// </summary>
     private static readonly Dictionary<string, HashSet<string>> WarningFields = new()
     {
-        ["rdb"] = ["node_type", "is_ha_cluster"],
-        ["redis"] = ["node_type", "cluster_size"]
+        [ScalewayResourceTypes.Rdb] = ["node_type", "is_ha_cluster"],
+        [ScalewayResourceTypes.Redis] = ["node_type", "cluster_size"]
     };
 
     /// <summary>
@@ -38,10 +38,10 @@ public sealed class DeploymentPlanner
     {
         return resourceType switch
         {
-            "rdb" => DeletionPolicy.Retain,
-            "redis" => DeletionPolicy.Retain,
-            "object-storage" => DeletionPolicy.Retain,
-            "secret" => DeletionPolicy.Retain,
+            ScalewayResourceTypes.Rdb => DeletionPolicy.Retain,
+            ScalewayResourceTypes.Redis => DeletionPolicy.Retain,
+            ScalewayResourceTypes.ObjectStorage => DeletionPolicy.Retain,
+            ScalewayResourceTypes.Secret => DeletionPolicy.Retain,
             _ => DeletionPolicy.Delete
         };
     }
@@ -114,7 +114,7 @@ public sealed class DeploymentPlanner
         CompareField(changes, "node_type", existing, "node_type", desired.NodeType);
         CompareField(changes, "is_ha_cluster", existing, "is_ha_cluster", desired.IsHaCluster.ToString().ToLowerInvariant());
 
-        return PlanUpdate(resourceName, "rdb", changes);
+        return PlanUpdate(resourceName, ScalewayResourceTypes.Rdb, changes);
     }
 
     /// <summary>
@@ -128,7 +128,7 @@ public sealed class DeploymentPlanner
         CompareField(changes, "node_type", existing, "node_type", desired.NodeType);
         CompareField(changes, "cluster_size", existing, "cluster_size", desired.ClusterSize.ToString());
 
-        return PlanUpdate(resourceName, "redis", changes);
+        return PlanUpdate(resourceName, ScalewayResourceTypes.Redis, changes);
     }
 
     private static void CompareField(Dictionary<string, (string? Current, string? Desired)> changes, string fieldName, JsonElement existing, string jsonProperty, string desiredValue)

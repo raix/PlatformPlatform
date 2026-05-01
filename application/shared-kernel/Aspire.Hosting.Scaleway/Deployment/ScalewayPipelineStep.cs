@@ -77,7 +77,7 @@ internal static class ScalewayPipelineStep
         }
 
         var approver = SelectApprover();
-        await ScalewayDeploymentStep.DeployAsync(environment, publishResources, apiClient, cancellationToken, approver);
+        await ScalewayDeploymentStep.DeployAsync(environment, publishResources, apiClient, approver, cancellationToken);
     }
 
     /// <summary>
@@ -103,7 +103,7 @@ internal static class ScalewayPipelineStep
     /// </summary>
     internal static IDeployApprover SelectApprover()
     {
-        var optIn = Environment.GetEnvironmentVariable("SCALEWAY_DEPLOY_INTERACTIVE") == "1";
+        var optIn = Environment.GetEnvironmentVariable("SCW_DEPLOY_INTERACTIVE") == "1";
         if (optIn && !Console.IsInputRedirected && !Console.IsOutputRedirected)
         {
             return new InteractiveConsoleApprover();

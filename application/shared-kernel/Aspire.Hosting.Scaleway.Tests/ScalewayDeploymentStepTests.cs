@@ -23,7 +23,7 @@ public sealed class ScalewayDeploymentStepTests
         var environment = CreateEnvironment("production");
 
         // Act
-        await ScalewayDeploymentStep.DeployAsync(environment, [], apiClient, CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, [], apiClient);
 
         // Assert
         createdResources.Should().Contain("private-networks");
@@ -48,7 +48,7 @@ public sealed class ScalewayDeploymentStepTests
         rdb.Annotations.Add(new PublishAsScalewayRdbAnnotation { Config = new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" } });
 
         // Act
-        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], apiClient, CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], apiClient);
 
         // Assert - should have created private network, registry, and RDB
         postBodies.Should().HaveCountGreaterOrEqualTo(3);
@@ -76,7 +76,7 @@ public sealed class ScalewayDeploymentStepTests
         rdb.Annotations.Add(new PublishAsScalewayRdbAnnotation());
 
         // Act
-        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], apiClient, CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], apiClient);
 
         // Assert - should create private network + registry but NOT the RDB (it exists)
         postCount.Should().Be(2);
@@ -107,7 +107,7 @@ public sealed class ScalewayDeploymentStepTests
         redis.Annotations.Add(new PublishAsScalewayRedisAnnotation());
 
         // Act
-        var changes = await ScalewayDeploymentStep.DryRunAsync(environment, [rdb, redis], apiClient, CancellationToken.None);
+        var changes = await ScalewayDeploymentStep.DryRunAsync(environment, [rdb, redis], apiClient);
 
         // Assert
         changes.Should().Contain(c => c.ResourceName == "staging-network" && c.ChangeType == DeploymentChangeType.Create);
@@ -135,7 +135,7 @@ public sealed class ScalewayDeploymentStepTests
         rdb.Annotations.Add(new PublishAsScalewayRdbAnnotation { Config = new ScalewayRdbPublishConfig { Region = ScalewayRegion.FrPar, Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" } });
 
         // Act
-        var changes = await ScalewayDeploymentStep.DryRunAsync(environment, [rdb], apiClient, CancellationToken.None);
+        var changes = await ScalewayDeploymentStep.DryRunAsync(environment, [rdb], apiClient);
 
         // Assert
         changes.Where(c => c.ChangeType == DeploymentChangeType.Create).Should().BeEmpty();
@@ -160,7 +160,7 @@ public sealed class ScalewayDeploymentStepTests
         rdb.Annotations.Add(new PublishAsScalewayRdbAnnotation { Config = new ScalewayRdbPublishConfig { Region = ScalewayRegion.NlAms, Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" } });
 
         // Act
-        var changes = await ScalewayDeploymentStep.DryRunAsync(environment, [rdb], apiClient, CancellationToken.None);
+        var changes = await ScalewayDeploymentStep.DryRunAsync(environment, [rdb], apiClient);
 
         // Assert
         changes.Should().Contain(c => c.IsBlocked && c.Description.Contains("region"));
@@ -183,7 +183,7 @@ public sealed class ScalewayDeploymentStepTests
         rdb.Annotations.Add(new PublishAsScalewayRdbAnnotation());
 
         // Act
-        await ScalewayDeploymentStep.DryRunAsync(environment, [rdb], apiClient, CancellationToken.None);
+        await ScalewayDeploymentStep.DryRunAsync(environment, [rdb], apiClient);
 
         // Assert
         postCount.Should().Be(0);

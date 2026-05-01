@@ -287,7 +287,7 @@ For first-time rollouts and high-stakes changes, you can step through the deploy
 
 | Variable | Purpose |
 |----------|---------|
-| `SCALEWAY_DEPLOY_INTERACTIVE=1` | Pause before each app-level resource and prompt `[a]pply / [s]kip / [q]uit`. Shared infrastructure (private network, registry namespace) is still auto-applied. The flag is ignored when stdin isn't a terminal — CI runs always fail fast. |
+| `SCW_DEPLOY_INTERACTIVE=1` | Pause before each app-level resource and prompt `[a]pply / [s]kip / [q]uit`. Shared infrastructure (private network, registry namespace) is still auto-applied. The flag is ignored when stdin isn't a terminal — CI runs always fail fast. |
 | `SCW_MONTHLY_BUDGET=<eur>` | Override the AppHost's `WithMonthlyBudget(...)` value at deploy time. Useful for QA projects with a tight cap. |
 
 ### Dry run against the local mock server first
@@ -308,7 +308,7 @@ Then in another terminal, point `aspire deploy` at the mock and walk it interact
 ```bash
 export SCW_API_URL=http://127.0.0.1:54321
 export SCW_ACCESS_KEY=test SCW_SECRET_KEY=test SCW_DEFAULT_PROJECT_ID=test
-export SCALEWAY_DEPLOY_INTERACTIVE=1
+export SCW_DEPLOY_INTERACTIVE=1
 aspire deploy --apphost application/AppHost/AppHost.csproj
 ```
 
@@ -326,7 +326,7 @@ export SCW_SECRET_KEY=<qa-secret>
 export SCW_MONTHLY_BUDGET=20
 
 # Step through each resource
-export SCALEWAY_DEPLOY_INTERACTIVE=1
+export SCW_DEPLOY_INTERACTIVE=1
 aspire deploy --apphost application/AppHost/AppHost.csproj
 ```
 

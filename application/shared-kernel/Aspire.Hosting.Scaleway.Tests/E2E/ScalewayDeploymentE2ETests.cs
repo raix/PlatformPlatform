@@ -37,7 +37,7 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
         );
 
         // Act
-        await ScalewayDeploymentStep.DeployAsync(environment, [rdb, redis], CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, [rdb, redis]);
 
         // Assert - infrastructure created in correct order
         var posts = _mockServer.ReceivedRequests.Where(r => r.Method == "POST").ToList();
@@ -70,7 +70,7 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
         rdb.Annotations.Add(new PublishAsScalewayRdbAnnotation());
 
         // Act
-        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, [rdb]);
 
         // Assert - all POST requests include the project ID
         var posts = _mockServer.ReceivedRequests.Where(r => r.Method == "POST").ToList();
@@ -84,7 +84,7 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
         var environment = CreateEnvironment("staging");
 
         // Act
-        await ScalewayDeploymentStep.DeployAsync(environment, [], CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, []);
 
         // Assert - all requests should have hit the mock server
         _mockServer.ReceivedRequests.Should().NotBeEmpty();
@@ -100,10 +100,10 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
         rdb.Annotations.Add(new PublishAsScalewayRdbAnnotation());
 
         // Act - deploy twice
-        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, [rdb]);
         var firstRunPosts = _mockServer.ReceivedRequests.Count(r => r.Method == "POST");
 
-        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, [rdb]);
         var secondRunPosts = _mockServer.ReceivedRequests.Count(r => r.Method == "POST") - firstRunPosts;
 
         // Assert - second run should not create anything new (all resources exist)
@@ -120,7 +120,7 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
         rdb.Annotations.Add(new PublishAsScalewayRdbAnnotation { Config = new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16" } });
 
         // Act
-        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, [rdb]);
 
         // Assert - resources stored in mock server's state
         _mockServer.Resources.Should().ContainKey("private-networks");
@@ -141,7 +141,7 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
         using var apiClient = new ScalewayApiClient(environment.CredentialConfig);
 
         // Act
-        var changes = await ScalewayDeploymentStep.DryRunAsync(environment, [rdb], apiClient, CancellationToken.None);
+        var changes = await ScalewayDeploymentStep.DryRunAsync(environment, [rdb], apiClient);
 
         // Assert
         _mockServer.ReceivedRequests.Where(r => r.Method == "POST").Should().BeEmpty();
@@ -163,11 +163,11 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
         );
 
         // Deploy first
-        await ScalewayDeploymentStep.DeployAsync(environment, [rdb], CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, [rdb]);
 
         // Act - dry run after deploy
         using var apiClient = new ScalewayApiClient(environment.CredentialConfig);
-        var changes = await ScalewayDeploymentStep.DryRunAsync(environment, [rdb], apiClient, CancellationToken.None);
+        var changes = await ScalewayDeploymentStep.DryRunAsync(environment, [rdb], apiClient);
 
         // Assert - no creates, no blocked changes
         changes.Where(c => c.ChangeType == DeploymentChangeType.Create).Should().BeEmpty();
@@ -188,7 +188,7 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
         );
 
         // Act
-        await ScalewayDeploymentStep.DeployAsync(environment, [container], CancellationToken.None);
+        await ScalewayDeploymentStep.DeployAsync(environment, [container]);
 
         // Assert
         var containerPost = _mockServer.ReceivedRequests

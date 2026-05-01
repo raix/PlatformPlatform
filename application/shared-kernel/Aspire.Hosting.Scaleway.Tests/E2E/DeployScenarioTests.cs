@@ -94,8 +94,8 @@ public sealed class DeployScenarioTests
         var result = await AppHostRunner.RunDeployAsync(mockServer.Url);
 
         result.ExitCode.Should().Be(0, "warnings on mutable fields should not block deploy.\n{0}", result.CombinedOutput);
-        // The warning is informational; today's DeployAsync only creates missing resources, so the
-        // existing RDB is left alone (no PATCH, no second POST). Containers and namespaces still get POSTed.
+        // DeployAsync only creates missing resources (no PATCH on warnings), so the existing RDB
+        // is left alone. Containers and namespaces still get POSTed.
         var rdbPosts = mockServer.ReceivedRequests.Where(r => r.Method == "POST" && r.Path.Contains("rdb/v1") && r.Path.Contains("instances")).ToList();
         rdbPosts.Should().BeEmpty("the existing RDB should not be re-created");
     }
