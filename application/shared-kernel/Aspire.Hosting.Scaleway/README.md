@@ -130,7 +130,7 @@ var changes = await ScalewayDeploymentStep.DryRunAsync(environment, resources, a
 foreach (var change in changes)
 {
     Console.WriteLine($"  {change.ChangeType}  {change.ResourceName}  {change.Description}");
-    if (change.IsBlocked) Console.WriteLine("    ⚠️  BLOCKED");
+    if (change.IsBlocked) Console.WriteLine("    [BLOCKED]");
 }
 ```
 

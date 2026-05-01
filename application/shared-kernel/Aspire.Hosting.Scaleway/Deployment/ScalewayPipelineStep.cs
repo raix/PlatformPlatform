@@ -152,9 +152,9 @@ internal static class ScalewayPipelineStep
             {
                 var marker = change.Severity switch
                 {
-                    DeploymentChangeSeverity.Blocked => "🚫",
-                    DeploymentChangeSeverity.Warning => "⚠️",
-                    _ => "•"
+                    DeploymentChangeSeverity.Blocked => "[BLOCKED]",
+                    DeploymentChangeSeverity.Warning => "[WARN]",
+                    _ => "[OK]"
                 };
                 sb.AppendLine($"- {marker} **{change.ChangeType}** `{change.ResourceName}` — {change.Description}");
             }
@@ -173,12 +173,12 @@ internal static class ScalewayPipelineStep
         if (plan.BudgetCheck is { } budget)
         {
             sb.AppendLine();
-            sb.AppendLine(budget.ExceedsBudget ? $"### 🚫 {budget.Message}" : $"### ✅ {budget.Message}");
+            sb.AppendLine(budget.ExceedsBudget ? $"### [OVER BUDGET] {budget.Message}" : $"### [WITHIN BUDGET] {budget.Message}");
         }
         else if (plan.CostSummary is not null)
         {
             sb.AppendLine();
-            sb.AppendLine("> 💡 Set a monthly cap with `WithMonthlyBudget(<eur>)` in AppHost or `SCW_MONTHLY_BUDGET=<eur>` to abort deploys above the cap.");
+            sb.AppendLine("> Tip: set a monthly cap with `WithMonthlyBudget(<eur>)` in AppHost or `SCW_MONTHLY_BUDGET=<eur>` to abort deploys above the cap.");
         }
 
         return sb.ToString().TrimEnd();
