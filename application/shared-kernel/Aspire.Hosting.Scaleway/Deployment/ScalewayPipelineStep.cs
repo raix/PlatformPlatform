@@ -48,19 +48,35 @@ internal static class ScalewayPipelineStep
             return;
         }
 
-        EnsureCredentials(environment);
+        var config = environment.CredentialConfig;
+        var missingCredentials = new List<string>();
+        if (string.IsNullOrEmpty(config.AccessKey)) missingCredentials.Add("SCW_ACCESS_KEY");
+        if (string.IsNullOrEmpty(config.SecretKey)) missingCredentials.Add("SCW_SECRET_KEY");
+        if (string.IsNullOrEmpty(config.DefaultProjectId)) missingCredentials.Add("SCW_DEFAULT_PROJECT_ID");
+        if (missingCredentials.Count > 0)
+        {
+            throw new DistributedApplicationException(
+                $"Scaleway credentials missing for environment '{environment.Name}'. Set the following environment variables before running aspire deploy: {string.Join(", ", missingCredentials)}."
+            );
+        }
 
-        using var apiClient = new ScalewayApiClient(environment.CredentialConfig);
+        using var apiClient = new ScalewayApiClient(config);
 
         var changes = await ScalewayDeploymentStep.DryRunAsync(environment, publishResources, apiClient, cancellationToken);
 
-        var costSummary = costEstimator is not null
-            ? await costEstimator(publishResources, cancellationToken)
-            : await EstimateWithDefaultClientAsync(publishResources, environment, cancellationToken);
+        DeploymentCostSummary costSummary;
+        if (costEstimator is not null)
+        {
+            costSummary = await costEstimator(publishResources, cancellationToken);
+        }
+        else
+        {
+            using var pricing = new ScalewayPricingClient();
+            costSummary = await pricing.EstimateDeploymentCostAsync(publishResources, config.DefaultRegion, cancellationToken);
+        }
 
         BudgetCheckResult? budgetCheck = null;
-        var effectiveBudget = ResolveMonthlyBudget(environment);
-        if (effectiveBudget is { } budget)
+        if (ResolveMonthlyBudget(environment) is { } budget)
         {
             budgetCheck = new BudgetCheckResult(budget, costSummary.TotalMonthlyPrice, "EUR");
         }
@@ -73,11 +89,24 @@ internal static class ScalewayPipelineStep
 
         if (!plan.CanDeploy)
         {
-            throw new DistributedApplicationException(BuildBlockedMessage(environment, plan));
+            var reasons = new List<string>();
+            if (plan.HasBlockedChanges)
+            {
+                var blocked = plan.Changes.Where(c => c.IsBlocked).Select(c => $"'{c.ResourceName}': {c.Description}");
+                reasons.Add($"blocked changes: {string.Join("; ", blocked)}");
+            }
+
+            if (plan.BudgetCheck is { ExceedsBudget: true } overBudget)
+            {
+                reasons.Add(overBudget.Message);
+            }
+
+            throw new DistributedApplicationException(
+                $"Scaleway deploy aborted for environment '{environment.Name}': {string.Join(" | ", reasons)}"
+            );
         }
 
-        var approver = SelectApprover();
-        await ScalewayDeploymentStep.DeployAsync(environment, publishResources, apiClient, approver, cancellationToken);
+        await ScalewayDeploymentStep.DeployAsync(environment, publishResources, apiClient, SelectApprover(), cancellationToken);
     }
 
     /// <summary>
@@ -110,31 +139,6 @@ internal static class ScalewayPipelineStep
         }
 
         return new AutoApprover();
-    }
-
-    private static async Task<DeploymentCostSummary> EstimateWithDefaultClientAsync(
-        IReadOnlyList<IResource> resources,
-        ScalewayEnvironmentResource environment,
-        CancellationToken cancellationToken)
-    {
-        using var pricing = new ScalewayPricingClient();
-        return await pricing.EstimateDeploymentCostAsync(resources, environment.CredentialConfig.DefaultRegion, cancellationToken);
-    }
-
-    internal static void EnsureCredentials(ScalewayEnvironmentResource environment)
-    {
-        var config = environment.CredentialConfig;
-        var missing = new List<string>();
-        if (string.IsNullOrEmpty(config.AccessKey)) missing.Add("SCW_ACCESS_KEY");
-        if (string.IsNullOrEmpty(config.SecretKey)) missing.Add("SCW_SECRET_KEY");
-        if (string.IsNullOrEmpty(config.DefaultProjectId)) missing.Add("SCW_DEFAULT_PROJECT_ID");
-
-        if (missing.Count > 0)
-        {
-            throw new DistributedApplicationException(
-                $"Scaleway credentials missing for environment '{environment.Name}'. Set the following environment variables before running aspire deploy: {string.Join(", ", missing)}."
-            );
-        }
     }
 
     internal static string FormatPlan(ScalewayEnvironmentResource environment, DeploymentPlan plan)
@@ -182,23 +186,5 @@ internal static class ScalewayPipelineStep
         }
 
         return sb.ToString().TrimEnd();
-    }
-
-    internal static string BuildBlockedMessage(ScalewayEnvironmentResource environment, DeploymentPlan plan)
-    {
-        var reasons = new List<string>();
-
-        if (plan.HasBlockedChanges)
-        {
-            var blocked = plan.Changes.Where(c => c.IsBlocked).Select(c => $"'{c.ResourceName}': {c.Description}");
-            reasons.Add($"blocked changes: {string.Join("; ", blocked)}");
-        }
-
-        if (plan.BudgetCheck is { ExceedsBudget: true } budget)
-        {
-            reasons.Add(budget.Message);
-        }
-
-        return $"Scaleway deploy aborted for environment '{environment.Name}': {string.Join(" | ", reasons)}";
     }
 }

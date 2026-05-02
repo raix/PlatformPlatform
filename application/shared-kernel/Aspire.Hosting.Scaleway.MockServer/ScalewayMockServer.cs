@@ -38,7 +38,7 @@ public sealed class ScalewayMockServer : IDisposable
                 _requests.Enqueue(new RecordedRequest(method, path + query, body, DateTimeOffset.UtcNow));
 
                 var resourceType = ExtractResourceType(path);
-                var arrayName = GetArrayName(resourceType);
+                var arrayName = resourceType.Replace("-", "_");
 
                 switch (method)
                 {
@@ -176,15 +176,6 @@ public sealed class ScalewayMockServer : IDisposable
         }
 
         return null;
-    }
-
-    private static string GetArrayName(string resourceType)
-    {
-        return resourceType switch
-        {
-            "private-networks" => "private_networks",
-            _ => resourceType.Replace("-", "_")
-        };
     }
 }
 

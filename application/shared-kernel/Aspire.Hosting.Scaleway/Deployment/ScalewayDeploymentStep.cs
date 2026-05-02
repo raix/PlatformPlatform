@@ -8,7 +8,7 @@ namespace Aspire.Hosting.Scaleway.Deployment;
 ///     (private network, registry, namespace), then provisions each resource.
 ///     Mirrors the CDKPublishingStep pattern from the AWS Aspire package.
 /// </summary>
-public static class ScalewayDeploymentStep
+internal static class ScalewayDeploymentStep
 {
     public static async Task DeployAsync(
         ScalewayEnvironmentResource environment,
