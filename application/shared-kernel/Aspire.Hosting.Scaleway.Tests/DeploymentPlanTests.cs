@@ -40,7 +40,7 @@ public sealed class DeploymentPlanTests
     {
         var plan = new DeploymentPlan(
             [new DeploymentChange("my-db", DeploymentChangeType.Create, DeploymentChangeSeverity.Safe, "Create rdb")],
-            new DeploymentCostSummary([new CostEstimate("my-db", "DB-DEV-S", 8.76m, "EUR", "DB-DEV-S")], 8.76m, "EUR"),
+            new DeploymentCostSummary([new CostEstimate("my-db", "rdb", "DB-DEV-S", 8.76m, "EUR", "DB-DEV-S")], 8.76m, "EUR"),
             new BudgetCheckResult(50m, 8.76m, "EUR")
         );
 
@@ -67,7 +67,7 @@ public sealed class DeploymentPlanTests
     {
         var plan = new DeploymentPlan(
             [new DeploymentChange("my-db", DeploymentChangeType.Create, DeploymentChangeSeverity.Safe, "Create rdb")],
-            new DeploymentCostSummary([new CostEstimate("my-db", "DB-GP-XL", 200m, "EUR", "DB-GP-XL")], 200m, "EUR"),
+            new DeploymentCostSummary([new CostEstimate("my-db", "rdb", "DB-GP-XL", 200m, "EUR", "DB-GP-XL")], 200m, "EUR"),
             new BudgetCheckResult(50m, 200m, "EUR")
         );
 
@@ -81,7 +81,7 @@ public sealed class DeploymentPlanTests
     {
         var plan = new DeploymentPlan(
             [new DeploymentChange("my-db", DeploymentChangeType.Create, DeploymentChangeSeverity.Safe, "Create rdb")],
-            new DeploymentCostSummary([new CostEstimate("my-db", "DB-GP-XL", 200m, "EUR", "DB-GP-XL")], 200m, "EUR"),
+            new DeploymentCostSummary([new CostEstimate("my-db", "rdb", "DB-GP-XL", 200m, "EUR", "DB-GP-XL")], 200m, "EUR"),
             null
         );
 

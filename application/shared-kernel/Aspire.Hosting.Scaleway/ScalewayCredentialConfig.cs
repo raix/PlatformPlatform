@@ -6,18 +6,25 @@ namespace Aspire.Hosting.Scaleway;
 /// </summary>
 public sealed class ScalewayCredentialConfig
 {
+    /// <summary>Read from <c>SCW_ACCESS_KEY</c>.</summary>
     public string? AccessKey { get; init; }
 
+    /// <summary>Read from <c>SCW_SECRET_KEY</c>.</summary>
     public string? SecretKey { get; init; }
 
+    /// <summary>Read from <c>SCW_DEFAULT_PROJECT_ID</c>.</summary>
     public string? DefaultProjectId { get; init; }
 
+    /// <summary>Read from <c>SCW_DEFAULT_ORGANIZATION_ID</c>.</summary>
     public string? DefaultOrganizationId { get; init; }
 
+    /// <summary>Read from <c>SCW_DEFAULT_REGION</c>; defaults to <see cref="ScalewayRegion.FrPar" />.</summary>
     public ScalewayRegion DefaultRegion { get; init; } = ScalewayRegion.FrPar;
 
+    /// <summary>Read from <c>SCW_DEFAULT_ZONE</c>; defaults to <see cref="ScalewayZone.FrPar1" />.</summary>
     public ScalewayZone DefaultZone { get; init; } = ScalewayZone.FrPar1;
 
+    /// <summary>Read from <c>SCW_API_URL</c>; defaults to the public Scaleway API host.</summary>
     public string ApiUrl { get; init; } = "https://api.scaleway.com";
 
     /// <summary>

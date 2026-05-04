@@ -10,6 +10,12 @@ namespace Aspire.Hosting.Scaleway.Deployment;
 /// </summary>
 internal static class ScalewayDeploymentStep
 {
+    /// <summary>
+    ///     Tag stamped on every resource provisioned by this pipeline. Lets a future
+    ///     reaper distinguish managed resources from anything created by hand.
+    /// </summary>
+    private const string AspireManagedTag = "aspire-managed";
+
     public static async Task DeployAsync(
         ScalewayEnvironmentResource environment,
         IEnumerable<IResource> resources,
@@ -93,7 +99,7 @@ internal static class ScalewayDeploymentStep
         }
 
         var result = await apiClient.CreateResourceAsync($"vpc/v2/regions/{region}/private-networks", region,
-            new { project_id = projectId, name = config.Name, tags = new[] { "aspire-managed" } }, cancellationToken
+            new { project_id = projectId, name = config.Name, tags = new[] { AspireManagedTag } }, cancellationToken
         );
         return result.GetProperty("id").GetString()!;
     }
@@ -144,7 +150,7 @@ internal static class ScalewayDeploymentStep
                 disable_backup = config.DisableBackup,
                 volume_size = config.VolumeSizeInGb * 1_000_000_000,
                 init_endpoints = new[] { new { private_network = new { private_network_id = privateNetworkId } } },
-                tags = new[] { "aspire-managed" }
+                tags = new[] { AspireManagedTag }
             }, cancellationToken
         );
     }
@@ -175,7 +181,7 @@ internal static class ScalewayDeploymentStep
                 user_name = "default",
                 password = ScalewayProvisioner.GeneratePassword(),
                 endpoints = new[] { new { private_network = new { id = privateNetworkId } } },
-                tags = new[] { "aspire-managed" }
+                tags = new[] { AspireManagedTag }
             }, cancellationToken
         );
     }
@@ -209,7 +215,7 @@ internal static class ScalewayDeploymentStep
                 privacy = config.Privacy,
                 port = config.Port,
                 private_network_id = privateNetworkId,
-                tags = new[] { "aspire-managed" }
+                tags = new[] { AspireManagedTag }
             }, cancellationToken
         );
     }

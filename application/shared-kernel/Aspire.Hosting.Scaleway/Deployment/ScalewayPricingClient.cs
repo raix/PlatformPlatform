@@ -14,6 +14,10 @@ namespace Aspire.Hosting.Scaleway.Deployment;
 public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDirectory = null, bool? cacheDisabled = null) : IDisposable
 {
     private const string DefaultCatalogBaseUrl = "https://api.scaleway.com";
+    private const decimal HoursPerMonth = 730m;
+    private const decimal SecondsPerHour = 3600m;
+    private const decimal ContainerVCpuPricePerSecond = 0.00001m;
+    private const decimal ContainerMemoryPricePerGbPerSecond = 0.000001m;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(24);
 
     private readonly string _cacheDirectory = cacheDirectory ?? DefaultCacheDirectory();
@@ -39,13 +43,13 @@ public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDi
     {
         var catalog = await GetCatalogAsync(config.Region, cancellationToken);
         var hourlyRate = FindPrice(catalog, config.NodeType);
-        var monthlyHours = 730m; // Average hours per month
         var multiplier = config.IsHaCluster ? 2m : 1m;
 
         return new CostEstimate(
+            "",
             ScalewayResourceTypes.Rdb,
             config.NodeType,
-            hourlyRate * monthlyHours * multiplier,
+            hourlyRate * HoursPerMonth * multiplier,
             "EUR",
             config.IsHaCluster ? $"{config.NodeType} x2 (HA)" : config.NodeType
         );
@@ -58,12 +62,12 @@ public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDi
     {
         var catalog = await GetCatalogAsync(config.Zone.ToRegion(), cancellationToken);
         var hourlyRate = FindPrice(catalog, config.NodeType);
-        var monthlyHours = 730m;
 
         return new CostEstimate(
+            "",
             ScalewayResourceTypes.Redis,
             config.NodeType,
-            hourlyRate * monthlyHours * config.ClusterSize,
+            hourlyRate * HoursPerMonth * config.ClusterSize,
             "EUR",
             config.ClusterSize > 1 ? $"{config.NodeType} x{config.ClusterSize}" : config.NodeType
         );
@@ -75,22 +79,17 @@ public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDi
     /// </summary>
     public Task<CostEstimate> EstimateContainerCostAsync(ScalewayContainerPublishConfig config, CancellationToken cancellationToken = default)
     {
-        // Serverless Containers: €0.00001/vCPU-s + €0.000001/GB-s
-        // 200k vCPU-s + 400k GB-s free per month
-        var vCpuPerSecond = 0.00001m;
-        var memoryPerGbPerSecond = 0.000001m;
-        var secondsPerMonth = 730m * 3600m;
-
+        // Serverless Containers bill per vCPU-second and per GB-second (free tier not modelled here).
+        var secondsPerMonth = HoursPerMonth * SecondsPerHour;
         var vCpus = config.CpuLimitMillicores / 1000m;
         var memoryGb = config.MemoryLimitMb / 1024m;
+        var costPerInstancePerMonth = (vCpus * ContainerVCpuPricePerSecond + memoryGb * ContainerMemoryPricePerGbPerSecond) * secondsPerMonth;
 
-        var minMonthlyCost = config.MinScale > 0
-            ? (vCpus * vCpuPerSecond + memoryGb * memoryPerGbPerSecond) * secondsPerMonth * config.MinScale
-            : 0m;
-
-        var maxMonthlyCost = (vCpus * vCpuPerSecond + memoryGb * memoryPerGbPerSecond) * secondsPerMonth * config.MaxScale;
+        var minMonthlyCost = config.MinScale > 0 ? costPerInstancePerMonth * config.MinScale : 0m;
+        var maxMonthlyCost = costPerInstancePerMonth * config.MaxScale;
 
         return Task.FromResult(new CostEstimate(
+                "",
                 ScalewayResourceTypes.Container,
                 $"{config.MemoryLimitMb}MB/{config.CpuLimitMillicores}mVCPU",
                 minMonthlyCost,
@@ -125,7 +124,7 @@ public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDi
 
             if (estimate is not null)
             {
-                estimates.Add(estimate with { ResourceType = resource.Name });
+                estimates.Add(estimate with { ResourceName = resource.Name });
             }
         }
 
@@ -303,7 +302,14 @@ public sealed class ScalewayPricingClient(HttpClient httpClient, string? cacheDi
     }
 }
 
-public sealed record CostEstimate(string ResourceType, string NodeType, decimal MonthlyPrice, string Currency, string Details);
+public sealed record CostEstimate(
+    string ResourceName,
+    string ResourceType,
+    string NodeType,
+    decimal MonthlyPrice,
+    string Currency,
+    string Details
+);
 
 public sealed record DeploymentCostSummary(IReadOnlyList<CostEstimate> Estimates, decimal TotalMonthlyPrice, string Currency);
 

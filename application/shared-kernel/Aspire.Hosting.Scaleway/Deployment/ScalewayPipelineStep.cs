@@ -170,7 +170,7 @@ internal static class ScalewayPipelineStep
             sb.AppendLine($"### Estimated monthly cost: €{costs.TotalMonthlyPrice:F2}");
             foreach (var estimate in costs.Estimates)
             {
-                sb.AppendLine($"- `{estimate.ResourceType}` — €{estimate.MonthlyPrice:F2} ({estimate.Details})");
+                sb.AppendLine($"- `{estimate.ResourceName}` — €{estimate.MonthlyPrice:F2} ({estimate.Details})");
             }
         }
 

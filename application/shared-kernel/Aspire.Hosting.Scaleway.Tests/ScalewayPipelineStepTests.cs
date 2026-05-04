@@ -114,7 +114,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
         var rdb = CreateRdbResource("my-db", new ScalewayRdbPublishConfig());
 
         var fakeCostSummary = new DeploymentCostSummary(
-            [new CostEstimate("my-db", "DB-DEV-S", 99m, "EUR", "DB-DEV-S")],
+            [new CostEstimate("my-db", "rdb", "DB-DEV-S", 99m, "EUR", "DB-DEV-S")],
             99m,
             "EUR"
         );
@@ -140,7 +140,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
             new DeploymentChange("my-db", DeploymentChangeType.Create, DeploymentChangeSeverity.Safe, "Create rdb 'my-db'")
         };
         var costs = new DeploymentCostSummary(
-            [new CostEstimate("my-db", "DB-DEV-S", 12m, "EUR", "DB-DEV-S")],
+            [new CostEstimate("my-db", "rdb", "DB-DEV-S", 12m, "EUR", "DB-DEV-S")],
             12m, "EUR"
         );
         var plan = new DeploymentPlan(changes, costs, null);
@@ -162,7 +162,7 @@ public sealed class ScalewayPipelineStepTests : IDisposable
             new DeploymentChange("my-db", DeploymentChangeType.Create, DeploymentChangeSeverity.Safe, "Create rdb 'my-db'")
         };
         var costs = new DeploymentCostSummary(
-            [new CostEstimate("my-db", "DB-DEV-S", 12m, "EUR", "DB-DEV-S")],
+            [new CostEstimate("my-db", "rdb", "DB-DEV-S", 12m, "EUR", "DB-DEV-S")],
             12m, "EUR"
         );
         var plan = new DeploymentPlan(changes, costs, new BudgetCheckResult(50m, 12m, "EUR"));
