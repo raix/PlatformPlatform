@@ -138,14 +138,29 @@ internal static class ScalewayDeploymentStep
             return;
         }
 
-        await apiClient.CreateResourceAsync($"rdb/v1/regions/{region}/instances", region, new
+        var secretClient = new ScalewaySecretClient(apiClient);
+        var resourceTags = new[] { AspireManagedTag, $"aspire-resource={resourceName}" };
+
+        // Get-or-create the password BEFORE the RDB create. On a partial-failure retry, the next
+        // run finds the orphaned secret and reuses its value — RDB and secret converge to the same
+        // password. The RDB existence check above ensures we don't redo any of this on idempotent
+        // reruns where the RDB already exists from a prior successful deploy.
+        var password = await secretClient.GetOrCreateAsync(
+            projectId, region,
+            $"rdb-{resourceName}-password",
+            ScalewayProvisioner.GeneratePassword,
+            resourceTags,
+            cancellationToken
+        );
+
+        var created = await apiClient.CreateResourceAsync($"rdb/v1/regions/{region}/instances", region, new
             {
                 project_id = projectId,
                 name = resourceName,
                 engine = config.Engine,
                 node_type = config.NodeType,
                 user_name = config.UserName,
-                password = ScalewayProvisioner.GeneratePassword(),
+                password,
                 is_ha_cluster = config.IsHaCluster,
                 disable_backup = config.DisableBackup,
                 volume_size = config.VolumeSizeInGb * 1_000_000_000,
@@ -153,6 +168,54 @@ internal static class ScalewayDeploymentStep
                 tags = new[] { AspireManagedTag }
             }, cancellationToken
         );
+
+        await StoreRdbConnectionDetailsAsync(secretClient, projectId, region, resourceName, created, config, resourceTags, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Persists the RDB endpoint + username so workloads can assemble a connection string from
+    ///     Secret Manager without an extra API call. Endpoint shape varies by Scaleway RDB version
+    ///     and connectivity mode (private network vs public); we extract defensively.
+    /// </summary>
+    private static async Task StoreRdbConnectionDetailsAsync(
+        ScalewaySecretClient secretClient,
+        string projectId,
+        string region,
+        string resourceName,
+        JsonElement instance,
+        ScalewayRdbPublishConfig config,
+        string[] tags,
+        CancellationToken cancellationToken)
+    {
+        if (instance.TryGetProperty("endpoint", out var endpoint))
+        {
+            await WriteEndpointSecretsAsync(endpoint);
+        }
+        else if (instance.TryGetProperty("endpoints", out var endpoints) && endpoints.ValueKind == JsonValueKind.Array)
+        {
+            var first = endpoints.EnumerateArray().FirstOrDefault();
+            if (first.ValueKind != JsonValueKind.Undefined)
+            {
+                await WriteEndpointSecretsAsync(first);
+            }
+        }
+
+        await secretClient.SetAsync(projectId, region, $"rdb-{resourceName}-username", config.UserName, tags, cancellationToken);
+
+        return;
+
+        async Task WriteEndpointSecretsAsync(JsonElement ep)
+        {
+            var host = ep.TryGetProperty("hostname", out var h) ? h.GetString() : null;
+            host ??= ep.TryGetProperty("ip", out var ip) ? ip.GetString() : null;
+            var port = ep.TryGetProperty("port", out var p) && p.ValueKind == JsonValueKind.Number ? p.GetInt32() : 5432;
+
+            if (host is not null)
+            {
+                await secretClient.SetAsync(projectId, region, $"rdb-{resourceName}-host", host, tags, cancellationToken);
+                await secretClient.SetAsync(projectId, region, $"rdb-{resourceName}-port", port.ToString(), tags, cancellationToken);
+            }
+        }
     }
 
     private static async Task ProvisionRedisAsync(

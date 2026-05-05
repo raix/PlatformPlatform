@@ -72,9 +72,13 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
         // Act
         await ScalewayDeploymentStep.DeployAsync(environment, [rdb]);
 
-        // Assert - all POST requests include the project ID
-        var posts = _mockServer.ReceivedRequests.Where(r => r.Method == "POST").ToList();
-        posts.Should().AllSatisfy(p => p.Body.Should().Contain("e2e-project"));
+        // Assert - resource-creation POSTs include the project ID. Secret-manager version POSTs
+        // (`/secrets/{id}/versions`) inherit project scope from the parent secret and only carry
+        // the value payload, so they're excluded.
+        var resourceCreationPosts = _mockServer.ReceivedRequests
+            .Where(r => r.Method == "POST" && !r.Path.Contains("/versions"))
+            .ToList();
+        resourceCreationPosts.Should().AllSatisfy(p => p.Body.Should().Contain("e2e-project"));
     }
 
     [Fact]

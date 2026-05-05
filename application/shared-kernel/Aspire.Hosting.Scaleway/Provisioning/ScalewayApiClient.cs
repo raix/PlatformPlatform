@@ -99,7 +99,17 @@ public sealed class ScalewayApiClient : IDisposable
     /// </summary>
     public async Task<JsonElement?> GetResourceAsync(string apiPath, string region, string resourceId, CancellationToken cancellationToken = default)
     {
-        var url = BuildUrl($"{apiPath}/{resourceId}", region);
+        return await GetAsync($"{apiPath}/{resourceId}", region, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Generic GET against an arbitrary path. Used for endpoints that don't follow the
+    ///     <c>{apiPath}/{id}</c> shape (e.g., Secret Manager's <c>/versions/latest_enabled/access</c>).
+    ///     Returns <c>null</c> on 404; throws on other errors.
+    /// </summary>
+    public async Task<JsonElement?> GetAsync(string apiPath, string region, CancellationToken cancellationToken = default)
+    {
+        var url = BuildUrl(apiPath, region);
         var response = await _httpClient.GetAsync(url, cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.NotFound)

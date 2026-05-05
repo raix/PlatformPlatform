@@ -18,6 +18,30 @@ public static class SharedInfrastructureConfiguration
 {
     public static readonly bool IsRunningInScaleway = Environment.GetEnvironmentVariable("SCW_SECRET_KEY") is not null;
 
+    /// <summary>
+    ///     Assembles a Postgres connection string from secrets surfaced by Scaleway Secret Manager.
+    ///     The deploy step writes <c>rdb-{instance}-host/port/username/password</c> per RDB instance;
+    ///     <see cref="ScalewaySecretManagerConfigurationProvider" /> loads them into <see cref="IConfiguration" />
+    ///     under their literal secret names. The platform currently has one shared RDB instance named
+    ///     <c>postgres</c> with N databases on it; the connection name (e.g. <c>account-database</c>)
+    ///     maps to a database name by stripping the trailing <c>-database</c> if present.
+    /// </summary>
+    private static string AssembleScalewayRdbConnectionString(IConfiguration configuration, string connectionName)
+    {
+        const string rdbInstance = "postgres";
+        var databaseName = connectionName.EndsWith("-database") ? connectionName[..^"-database".Length] : connectionName;
+
+        var host = configuration[$"rdb-{rdbInstance}-host"]
+                   ?? throw new InvalidOperationException($"Missing Secret Manager value 'rdb-{rdbInstance}-host'. Has the deploy step run against this environment?");
+        var port = configuration[$"rdb-{rdbInstance}-port"] ?? "5432";
+        var username = configuration[$"rdb-{rdbInstance}-username"]
+                       ?? throw new InvalidOperationException($"Missing Secret Manager value 'rdb-{rdbInstance}-username'.");
+        var password = configuration[$"rdb-{rdbInstance}-password"]
+                       ?? throw new InvalidOperationException($"Missing Secret Manager value 'rdb-{rdbInstance}-password'.");
+
+        return $"Host={host};Port={port};Database={databaseName};Username={username};Password={password};Ssl Mode=VerifyFull;";
+    }
+
     extension(IHostApplicationBuilder builder)
     {
         public IHostApplicationBuilder AddSharedInfrastructure<T>(string connectionName)
@@ -54,7 +78,7 @@ public static class SharedInfrastructureConfiguration
         {
             // Scaleway RDB and local dev both use standard connection strings
             var connectionString = IsRunningInScaleway
-                ? Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING")
+                ? AssembleScalewayRdbConnectionString(builder.Configuration, connectionName)
                 : builder.Configuration.GetConnectionString(connectionName);
 
             builder.Services.AddDbContext<T>(options =>
