@@ -79,7 +79,7 @@ internal static class ScalewayDeploymentStep
                     await ProvisionRedisAsync(apiClient, zone, projectId, resource.Name, redisAnnotation.Config, privateNetwork, cancellationToken);
                     break;
                 case PublishAsScalewayContainerAnnotation containerAnnotation:
-                    await ProvisionContainerAsync(apiClient, region, projectId, resource.Name, containerAnnotation.Config, privateNetwork, cancellationToken);
+                    await ProvisionContainerAsync(apiClient, region, projectId, resource, containerAnnotation.Config, privateNetwork, environment.CredentialConfig, cancellationToken);
                     break;
             }
         }
@@ -253,11 +253,13 @@ internal static class ScalewayDeploymentStep
         ScalewayApiClient apiClient,
         string region,
         string projectId,
-        string resourceName,
+        IResource resource,
         ScalewayContainerPublishConfig config,
         string privateNetworkId,
+        ScalewayCredentialConfig credentialConfig,
         CancellationToken cancellationToken)
     {
+        var resourceName = resource.Name;
         var namespaceId = await FindOrCreateContainerNamespaceAsync(apiClient, region, projectId, config, cancellationToken);
 
         var existing = await FindByNameAsync(apiClient, $"containers/v1beta1/regions/{region}/containers", region, projectId, resourceName, cancellationToken);
@@ -265,6 +267,8 @@ internal static class ScalewayDeploymentStep
         {
             return;
         }
+
+        var environmentVariables = await ResolveEnvironmentVariablesAsync(resource, credentialConfig, cancellationToken);
 
         await apiClient.CreateResourceAsync($"containers/v1beta1/regions/{region}/containers", region, new
             {
@@ -278,9 +282,65 @@ internal static class ScalewayDeploymentStep
                 privacy = config.Privacy,
                 port = config.Port,
                 private_network_id = privateNetworkId,
+                environment_variables = environmentVariables,
                 tags = new[] { AspireManagedTag }
             }, cancellationToken
         );
+    }
+
+    /// <summary>
+    ///     Resolves the env vars Aspire wants on this workload via its <c>EnvironmentCallbackAnnotation</c>s,
+    ///     and unconditionally adds the <c>SCW_*</c> credentials so the workload can authenticate to
+    ///     Scaleway Secret Manager (where database credentials and other secrets live).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         v1 uses the deploy-job's broad-scope SCW key for every workload. Per-workload least-privilege
+    ///         keys land in a follow-up commit on the same task — this commit closes the bigger gap that
+    ///         no env vars at all reached deployed containers.
+    ///     </para>
+    ///     <para>
+    ///         Only literal string values are injected. <see cref="IValueProvider" /> values
+    ///         (e.g. <c>ParameterResource</c>, <c>WithReference(database)</c> connection strings) are skipped:
+    ///         resolving them would block on parameter-store / endpoint discovery that doesn't exist in publish mode,
+    ///         and workloads read the values they actually need (database connection string, OAuth secrets) from
+    ///         Scaleway Secret Manager at runtime instead of from env vars.
+    ///     </para>
+    /// </remarks>
+    private static async Task<Dictionary<string, string>> ResolveEnvironmentVariablesAsync(
+        IResource resource,
+        ScalewayCredentialConfig credentialConfig,
+        CancellationToken cancellationToken)
+    {
+        var resolved = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["SCW_ACCESS_KEY"] = credentialConfig.AccessKey ?? string.Empty,
+            ["SCW_SECRET_KEY"] = credentialConfig.SecretKey ?? string.Empty,
+            ["SCW_DEFAULT_PROJECT_ID"] = credentialConfig.DefaultProjectId ?? string.Empty,
+            ["SCW_DEFAULT_REGION"] = credentialConfig.DefaultRegion.ToApiString()
+        };
+
+        var callbacks = resource.Annotations.OfType<EnvironmentCallbackAnnotation>().ToArray();
+        if (callbacks.Length == 0) return resolved;
+
+        var raw = new Dictionary<string, object>(StringComparer.Ordinal);
+        var executionContext = new DistributedApplicationExecutionContext(DistributedApplicationOperation.Publish);
+        var context = new EnvironmentCallbackContext(executionContext, resource, raw, cancellationToken);
+
+        foreach (var callback in callbacks)
+        {
+            await callback.Callback(context);
+        }
+
+        foreach (var (key, value) in raw)
+        {
+            if (value is string literal)
+            {
+                resolved[key] = literal;
+            }
+        }
+
+        return resolved;
     }
 
     private static async Task<string> FindOrCreateContainerNamespaceAsync(

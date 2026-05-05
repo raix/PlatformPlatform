@@ -204,6 +204,36 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
         containerPost.Body.Should().Contain("512000000"); // memory in bytes
     }
 
+    [Fact]
+    public async Task FullDeploy_ContainerShouldReceiveScalewayCredentialsAsEnvironmentVariables()
+    {
+        // Arrange
+        var environment = CreateEnvironment("staging");
+
+        var container = new ScalewayRdbInstanceResource("my-api");
+        container.Annotations.Add(new PublishAsScalewayContainerAnnotation
+            {
+                Config = new ScalewayContainerPublishConfig { MemoryLimitMb = 256, MaxScale = 1, Port = 8080 }
+            }
+        );
+
+        // Act
+        await ScalewayDeploymentStep.DeployAsync(environment, [container]);
+
+        // Assert — without these env vars, the workload can't authenticate to read its connection
+        // string from Scaleway Secret Manager and crashes on first DB call.
+        var containerPost = _mockServer.ReceivedRequests
+            .Where(r => r.Method == "POST")
+            .FirstOrDefault(r => r.Path.Contains("containers") && !r.Path.Contains("namespaces"));
+
+        containerPost.Should().NotBeNull();
+        containerPost.Body.Should().Contain("environment_variables");
+        containerPost.Body.Should().Contain("SCW_ACCESS_KEY");
+        containerPost.Body.Should().Contain("SCW_SECRET_KEY");
+        containerPost.Body.Should().Contain("SCW_DEFAULT_PROJECT_ID");
+        containerPost.Body.Should().Contain("SCW_DEFAULT_REGION");
+    }
+
     private ScalewayEnvironmentResource CreateEnvironment(string name)
     {
         var config = new ScalewayCredentialConfig
