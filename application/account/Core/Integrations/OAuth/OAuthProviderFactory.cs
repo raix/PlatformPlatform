@@ -41,7 +41,7 @@ public sealed class OAuthProviderFactory(IServiceProvider serviceProvider, IConf
     {
         var allowMockProvider = configuration.GetValue<bool>("OAuth:AllowMockProvider");
 
-        if (allowMockProvider && SharedInfrastructureConfiguration.IsRunningInScaleway)
+        if (allowMockProvider && SharedInfrastructureConfiguration.IsRunningInCloud)
         {
             throw new InvalidOperationException("Mock OAuth provider cannot be enabled in cloud environments.");
         }

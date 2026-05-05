@@ -26,7 +26,7 @@ var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 using var scope = host.Services.CreateScope();
 
 // Apply migrations to the database only when running locally
-if (!SharedInfrastructureConfiguration.IsRunningInScaleway)
+if (!SharedInfrastructureConfiguration.IsRunningInCloud)
 {
     var migrationService = scope.ServiceProvider.GetRequiredService<DatabaseMigrationService<AccountDbContext>>();
     migrationService.ApplyMigrations();

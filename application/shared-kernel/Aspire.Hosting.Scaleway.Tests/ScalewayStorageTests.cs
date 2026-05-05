@@ -101,7 +101,7 @@ public sealed class ScalewayStorageTests
         var container = builder.AddContainer("my-app", "my-image");
 
         // Act
-        container.WithS3Storage(storage);
+        container.WithS3Storage(storage, "ACCOUNT_STORAGE_URL");
 
         // Assert - the annotation exists on storage, confirming wiring is possible
         storage.Resource.Annotations.OfType<InnerS3ContainerAnnotation>().Should().ContainSingle();

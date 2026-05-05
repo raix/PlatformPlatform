@@ -59,7 +59,7 @@ var accountDatabase = postgres.AddDatabase("account-database", "account");
 var accountWorkers = builder
     .AddProject<Account_Workers>("account-workers")
     .WithReference(accountDatabase)
-    .WithS3Storage(objectStorage)
+    .WithS3Storage(objectStorage, "ACCOUNT_STORAGE_URL")
     .WaitFor(accountDatabase)
     .PublishAsStandardScalewayContainer(5);
 
@@ -67,7 +67,7 @@ var accountApi = builder
     .AddProject<Account_Api>("account-api")
     .WithUrlConfiguration("/account")
     .WithReference(accountDatabase)
-    .WithS3Storage(objectStorage)
+    .WithS3Storage(objectStorage, "ACCOUNT_STORAGE_URL")
     .WithEnvironment("OAuth__Google__ClientId", googleOAuthClientId)
     .WithEnvironment("OAuth__Google__ClientSecret", googleOAuthClientSecret)
     .WithEnvironment("OAuth__AllowMockProvider", "true")
@@ -84,7 +84,6 @@ var backOfficeDatabase = postgres.AddDatabase("back-office-database", "back-offi
 var backOfficeWorkers = builder
     .AddProject<BackOffice_Workers>("back-office-workers")
     .WithReference(backOfficeDatabase)
-    .WithS3Storage(objectStorage)
     .WaitFor(backOfficeDatabase)
     .PublishAsStandardScalewayContainer(5);
 
@@ -92,7 +91,6 @@ var backOfficeApi = builder
     .AddProject<BackOffice_Api>("back-office-api")
     .WithUrlConfiguration("/back-office")
     .WithReference(backOfficeDatabase)
-    .WithS3Storage(objectStorage)
     .WaitFor(backOfficeWorkers)
     .PublishAsStandardScalewayContainer(10);
 
@@ -101,7 +99,6 @@ var mainDatabase = postgres.AddDatabase("main-database", "main");
 var mainWorkers = builder
     .AddProject<Main_Workers>("main-workers")
     .WithReference(mainDatabase)
-    .WithS3Storage(objectStorage)
     .WaitFor(mainDatabase)
     .PublishAsStandardScalewayContainer(5);
 
@@ -109,7 +106,6 @@ var mainApi = builder
     .AddProject<Main_Api>("main-api")
     .WithUrlConfiguration("")
     .WithReference(mainDatabase)
-    .WithS3Storage(objectStorage)
     .WithEnvironment("PUBLIC_GOOGLE_OAUTH_ENABLED", googleOAuthConfigured ? "true" : "false")
     .WithEnvironment("PUBLIC_SUBSCRIPTION_ENABLED", stripeFullyConfigured ? "true" : "false")
     .WaitFor(mainWorkers)
@@ -121,6 +117,7 @@ var appGateway = builder
     .WithReference(accountApi)
     .WithReference(backOfficeApi)
     .WithReference(mainApi)
+    .WithS3Storage(objectStorage, "ACCOUNT_STORAGE_URL")
     .WaitFor(accountApi)
     .WaitFor(frontendBuild)
     .WithUrlForEndpoint("https", url => url.DisplayText = "Web App")

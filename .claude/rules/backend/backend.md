@@ -60,7 +60,7 @@ Guidelines for C# backend development, including code style, naming, exceptions,
 - Don't do defensive coding (e.g., don't add exception handling for situations we don't know will happen)
 - Use `user?.IsActive == true` over `user != null && user.IsActive == true`
 - Avoid try-catch unless we cannot fix the root cause—global exception handling covers unknown exceptions
-- Use `SharedInfrastructureConfiguration.IsRunningInScaleway` to determine if running in Scaleway
+- Use `SharedInfrastructureConfiguration.IsRunningInCloud` to determine whether the workload is running in cloud (vs local dev)
 - Inject `TimeProvider` into services and handlers, use `timeProvider.GetUtcNow()` instead of `DateTimeOffset.UtcNow`
 - Pass `DateTimeOffset` values (not `TimeProvider`) to domain methods and aggregates to maintain clean boundaries (e.g., `entity.HasExpired(timeProvider.GetUtcNow())`)
 - Naming rules:

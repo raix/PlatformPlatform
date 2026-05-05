@@ -217,7 +217,7 @@ Secrets are loaded from Scaleway Secret Manager into .NET configuration at start
 
 ```csharp
 // In SharedInfrastructureConfiguration - automatic when running on Scaleway
-if (IsRunningInScaleway)
+if (IsRunningInCloud)
 {
     builder.Configuration.AddScalewaySecretManager(reloadInterval: TimeSpan.FromMinutes(1));
 }
@@ -271,8 +271,8 @@ This fetches `types.gen.ts` from `scaleway/scaleway-sdk-js` on GitHub, parses `C
 
 | Variable | Purpose |
 |----------|---------|
-| `S3_ENDPOINT` | Object Storage endpoint |
-| `DATABASE_CONNECTION_STRING` | PostgreSQL connection string |
+| `<SCS>_STORAGE_URL` | Per-SCS Object Storage endpoint (e.g. `ACCOUNT_STORAGE_URL`). Wired via `WithS3Storage(objectStorage, envVarName)` in AppHost. |
+| `rdb-postgres-host` / `rdb-postgres-port` / `rdb-postgres-username` / `rdb-postgres-password` | Per-RDB-instance Secret Manager values written by the deploy step. SharedKernel assembles a connection string per database from these. |
 | `SMTP_HOST` | Email SMTP host |
 | `SMTP_PORT` | Email SMTP port |
 | `SMTP_USERNAME` | Email SMTP username |

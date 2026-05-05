@@ -41,7 +41,7 @@ builder.AddScalewayTemDomain("mail-server")
 
 ## Environment Detection
 
-Use `SharedInfrastructureConfiguration.IsRunningInScaleway` to detect cloud vs local dev. This checks for the `SCW_SECRET_KEY` environment variable.
+Use `SharedInfrastructureConfiguration.IsRunningInCloud` to detect cloud vs local dev. This checks for the `SCW_SECRET_KEY` environment variable.
 
 ## Secrets Management
 
@@ -54,7 +54,7 @@ Two layers, mirroring the original Azure Key Vault pattern:
 Key environment variables in production:
 - `SCW_ACCESS_KEY`, `SCW_SECRET_KEY` — Scaleway API credentials
 - `SCW_DEFAULT_PROJECT_ID`, `SCW_DEFAULT_REGION` — Project and region
-- `S3_ENDPOINT` — Object Storage endpoint
+- `<SCS>_STORAGE_URL` — per-SCS Object Storage endpoint (e.g. `ACCOUNT_STORAGE_URL`). Each SCS has its own variable so different SCSs can target different buckets or backends.
 - `DATABASE_CONNECTION_STRING` — PostgreSQL connection string
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SENDER_EMAIL_ADDRESS` — Email (TEM)
 

@@ -16,7 +16,7 @@ namespace SharedKernel.Configuration;
 
 public static class SharedInfrastructureConfiguration
 {
-    public static readonly bool IsRunningInScaleway = Environment.GetEnvironmentVariable("SCW_SECRET_KEY") is not null;
+    public static readonly bool IsRunningInCloud = Environment.GetEnvironmentVariable("SCW_SECRET_KEY") is not null;
 
     /// <summary>
     ///     Assembles a Postgres connection string from secrets surfaced by Scaleway Secret Manager.
@@ -47,14 +47,13 @@ public static class SharedInfrastructureConfiguration
         public IHostApplicationBuilder AddSharedInfrastructure<T>(string connectionName)
             where T : DbContext
         {
-            if (IsRunningInScaleway)
+            if (IsRunningInCloud)
             {
                 builder.Configuration.AddScalewaySecretManager(reloadInterval: TimeSpan.FromMinutes(1));
             }
 
             builder
                 .ConfigureDatabaseContext<T>(connectionName)
-                .AddDefaultBlobStorage()
                 .AddConfigureOpenTelemetry()
                 .AddOpenTelemetryExporters();
 
@@ -77,7 +76,7 @@ public static class SharedInfrastructureConfiguration
             where T : DbContext
         {
             // Scaleway RDB and local dev both use standard connection strings
-            var connectionString = IsRunningInScaleway
+            var connectionString = IsRunningInCloud
                 ? AssembleScalewayRdbConnectionString(builder.Configuration, connectionName)
                 : builder.Configuration.GetConnectionString(connectionName);
 
@@ -88,79 +87,45 @@ public static class SharedInfrastructureConfiguration
             return builder;
         }
 
-        private IHostApplicationBuilder AddDefaultBlobStorage()
-        {
-            var s3Endpoint = Environment.GetEnvironmentVariable("S3_ENDPOINT");
-            if (s3Endpoint is null)
-            {
-                // Register a no-op client for test/build scenarios where S3 is not available
-                builder.Services.TryAddSingleton<IBlobStorageClient>(sp =>
-                    new S3BlobStorageClient(new AmazonS3Client(new AmazonS3Config { ServiceURL = "http://localhost:8333", ForcePathStyle = true }), "http://localhost:8333", sp.GetRequiredService<TimeProvider>())
-                );
-                return builder;
-            }
-
-            var s3Config = new AmazonS3Config
-            {
-                ServiceURL = s3Endpoint,
-                ForcePathStyle = true,
-                UseHttp = !IsRunningInScaleway && !s3Endpoint.StartsWith("https")
-            };
-
-            var s3Client = IsRunningInScaleway
-                ? new AmazonS3Client(
-                    Environment.GetEnvironmentVariable("SCW_ACCESS_KEY"),
-                    Environment.GetEnvironmentVariable("SCW_SECRET_KEY"),
-                    s3Config
-                )
-                : new AmazonS3Client(s3Config);
-
-            builder.Services.AddSingleton<IBlobStorageClient>(sp =>
-                new S3BlobStorageClient(s3Client, s3Endpoint, sp.GetRequiredService<TimeProvider>())
-            );
-
-            return builder;
-        }
-
         /// <summary>
         ///     Register different storage accounts for BlobStorage using .NET Keyed services, when a service needs to access
-        ///     multiple storage accounts.
+        ///     multiple storage accounts. Each connection routes to its own per-SCS endpoint env var (e.g.
+        ///     <c>ACCOUNT_STORAGE_URL</c>),
+        ///     so different SCSs can target different buckets — or different storage backends — without code changes.
         /// </summary>
         public IHostApplicationBuilder AddNamedBlobStorages((string ConnectionName, string EnvironmentVariable)?[] connections)
         {
-            var s3Endpoint = Environment.GetEnvironmentVariable("S3_ENDPOINT");
-            if (s3Endpoint is null)
-            {
-                // Register no-op keyed clients for test/build scenarios
-                foreach (var connection in connections)
-                {
-                    builder.Services.TryAddKeyedSingleton<IBlobStorageClient>(connection!.Value.ConnectionName,
-                        (sp, _) => new S3BlobStorageClient(new AmazonS3Client(new AmazonS3Config { ServiceURL = "http://localhost:8333", ForcePathStyle = true }), "http://localhost:8333", sp.GetRequiredService<TimeProvider>())
-                    );
-                }
-
-                return builder;
-            }
-
-            var s3Config = new AmazonS3Config
-            {
-                ServiceURL = s3Endpoint,
-                ForcePathStyle = true,
-                UseHttp = !IsRunningInScaleway && !s3Endpoint.StartsWith("https")
-            };
-
-            var s3Client = IsRunningInScaleway
-                ? new AmazonS3Client(
-                    Environment.GetEnvironmentVariable("SCW_ACCESS_KEY"),
-                    Environment.GetEnvironmentVariable("SCW_SECRET_KEY"),
-                    s3Config
-                )
-                : new AmazonS3Client(s3Config);
-
             foreach (var connection in connections)
             {
-                builder.Services.AddKeyedSingleton<IBlobStorageClient>(connection!.Value.ConnectionName,
-                    (sp, _) => new S3BlobStorageClient(s3Client, s3Endpoint, sp.GetRequiredService<TimeProvider>())
+                var (connectionName, envVarName) = connection!.Value;
+                var endpoint = Environment.GetEnvironmentVariable(envVarName);
+
+                if (endpoint is null)
+                {
+                    // Register no-op keyed client for test/build scenarios where the endpoint isn't set.
+                    builder.Services.TryAddKeyedSingleton<IBlobStorageClient>(connectionName,
+                        (sp, _) => new S3BlobStorageClient(new AmazonS3Client(new AmazonS3Config { ServiceURL = "http://localhost:8333", ForcePathStyle = true }), "http://localhost:8333", sp.GetRequiredService<TimeProvider>())
+                    );
+                    continue;
+                }
+
+                var s3Config = new AmazonS3Config
+                {
+                    ServiceURL = endpoint,
+                    ForcePathStyle = true,
+                    UseHttp = !IsRunningInCloud && !endpoint.StartsWith("https")
+                };
+
+                var s3Client = IsRunningInCloud
+                    ? new AmazonS3Client(
+                        Environment.GetEnvironmentVariable("SCW_ACCESS_KEY"),
+                        Environment.GetEnvironmentVariable("SCW_SECRET_KEY"),
+                        s3Config
+                    )
+                    : new AmazonS3Client(s3Config);
+
+                builder.Services.AddKeyedSingleton<IBlobStorageClient>(connectionName,
+                    (sp, _) => new S3BlobStorageClient(s3Client, endpoint, sp.GetRequiredService<TimeProvider>())
                 );
             }
 

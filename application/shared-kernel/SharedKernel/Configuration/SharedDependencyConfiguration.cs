@@ -30,7 +30,7 @@ public static class SharedDependencyConfiguration
 
     public static ITokenSigningClient GetTokenSigningService()
     {
-        if (SharedInfrastructureConfiguration.IsRunningInScaleway)
+        if (SharedInfrastructureConfiguration.IsRunningInCloud)
         {
             return new ScalewayTokenSigningClient();
         }
@@ -69,7 +69,7 @@ public static class SharedDependencyConfiguration
             // Configure shared data protection to ensure encrypted data can be shared across all self-contained systems
             var dataProtection = services.AddDataProtection();
 
-            if (!SharedInfrastructureConfiguration.IsRunningInScaleway)
+            if (!SharedInfrastructureConfiguration.IsRunningInCloud)
             {
                 // Set a common application name for all self-contained systems for local development (handled automatically by Scaleway container runtime)
                 dataProtection.SetApplicationName("PlatformPlatform");
@@ -127,7 +127,7 @@ public static class SharedDependencyConfiguration
 
         private IServiceCollection AddEmailClient()
         {
-            if (SharedInfrastructureConfiguration.IsRunningInScaleway)
+            if (SharedInfrastructureConfiguration.IsRunningInCloud)
             {
                 services.AddTransient<IEmailClient, SmtpEmailClient>();
             }

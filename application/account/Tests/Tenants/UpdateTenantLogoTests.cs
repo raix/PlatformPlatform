@@ -11,8 +11,8 @@ public sealed class UpdateTenantLogoTests : EndpointBaseTest<AccountDbContext>
 {
     public UpdateTenantLogoTests()
     {
-        // Set up S3 endpoint for tests - tests won't actually upload files
-        Environment.SetEnvironmentVariable("S3_ENDPOINT", "http://localhost:8333");
+        // Set up the per-SCS storage endpoint for tests - tests won't actually upload files
+        Environment.SetEnvironmentVariable("ACCOUNT_STORAGE_URL", "http://localhost:8333");
     }
 
     [Fact]
