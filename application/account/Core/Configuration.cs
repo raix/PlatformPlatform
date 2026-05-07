@@ -27,7 +27,7 @@ public static class Configuration
             // Infrastructure is configured separately from other Infrastructure services to allow mocking in tests
             return builder
                 .AddSharedInfrastructure<AccountDbContext>("account-database")
-                .AddNamedBlobStorages([("account-storage", "ACCOUNT_STORAGE_URL")]);
+                .AddNamedBlobStorages(["account-storage"]);
         }
     }
 

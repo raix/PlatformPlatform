@@ -64,20 +64,19 @@ public static class ScalewayStorageLocalExtensions
     }
 
     /// <summary>
-    ///     Wires the local storage container's S3 endpoint into a project as the named env var
-    ///     (e.g. <c>ACCOUNT_STORAGE_URL</c>). Each SCS gets its own env var so per-SCS isolation
-    ///     is preserved at the storage layer — even when buckets share an endpoint.
+    ///     Wires the local storage container's S3 endpoint into a project as the <c>BLOB_STORAGE_URL</c>
+    ///     environment variable. All SCSs share the same endpoint; per-SCS isolation is via bucket name
+    ///     (the <c>AddNamedBlobStorages</c> connection name).
     /// </summary>
     public static IResourceBuilder<T> WithS3Storage<T>(
         this IResourceBuilder<T> projectBuilder,
-        IResourceBuilder<ScalewayObjectStorageResource> storageBuilder,
-        string envVarName) where T : IResourceWithEnvironment, IResourceWithWaitSupport
+        IResourceBuilder<ScalewayObjectStorageResource> storageBuilder) where T : IResourceWithEnvironment, IResourceWithWaitSupport
     {
         var s3Annotation = storageBuilder.Resource.Annotations.OfType<InnerS3ContainerAnnotation>().FirstOrDefault();
 
         if (s3Annotation is not null)
         {
-            projectBuilder.WithEnvironment(envVarName, s3Annotation.InnerBuilder.GetEndpoint(s3Annotation.EndpointName));
+            projectBuilder.WithEnvironment("BLOB_STORAGE_URL", s3Annotation.InnerBuilder.GetEndpoint(s3Annotation.EndpointName));
             projectBuilder.WaitFor(s3Annotation.InnerBuilder);
         }
 

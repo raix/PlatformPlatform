@@ -271,7 +271,7 @@ This fetches `types.gen.ts` from `scaleway/scaleway-sdk-js` on GitHub, parses `C
 
 | Variable | Purpose |
 |----------|---------|
-| `<SCS>_STORAGE_URL` | Per-SCS Object Storage endpoint (e.g. `ACCOUNT_STORAGE_URL`). Wired via `WithS3Storage(objectStorage, envVarName)` in AppHost. |
+| `BLOB_STORAGE_URL` | Object Storage endpoint (one regional endpoint hosts many buckets). Wired via `WithS3Storage(objectStorage)` in AppHost. Per-SCS isolation is via bucket name. |
 | `rdb-postgres-host` / `rdb-postgres-port` / `rdb-postgres-username` / `rdb-postgres-password` | Per-RDB-instance Secret Manager values written by the deploy step. SharedKernel assembles a connection string per database from these. |
 | `SMTP_HOST` | Email SMTP host |
 | `SMTP_PORT` | Email SMTP port |

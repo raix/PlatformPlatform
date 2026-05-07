@@ -59,7 +59,7 @@ var accountDatabase = postgres.AddDatabase("account-database", "account");
 var accountWorkers = builder
     .AddProject<Account_Workers>("account-workers")
     .WithReference(accountDatabase)
-    .WithS3Storage(objectStorage, "ACCOUNT_STORAGE_URL")
+    .WithS3Storage(objectStorage)
     .WaitFor(accountDatabase)
     .PublishAsStandardScalewayContainer(5);
 
@@ -67,7 +67,7 @@ var accountApi = builder
     .AddProject<Account_Api>("account-api")
     .WithUrlConfiguration("/account")
     .WithReference(accountDatabase)
-    .WithS3Storage(objectStorage, "ACCOUNT_STORAGE_URL")
+    .WithS3Storage(objectStorage)
     .WithEnvironment("OAuth__Google__ClientId", googleOAuthClientId)
     .WithEnvironment("OAuth__Google__ClientSecret", googleOAuthClientSecret)
     .WithEnvironment("OAuth__AllowMockProvider", "true")
@@ -117,7 +117,7 @@ var appGateway = builder
     .WithReference(accountApi)
     .WithReference(backOfficeApi)
     .WithReference(mainApi)
-    .WithS3Storage(objectStorage, "ACCOUNT_STORAGE_URL")
+    .WithS3Storage(objectStorage)
     .WaitFor(accountApi)
     .WaitFor(frontendBuild)
     .WithUrlForEndpoint("https", url => url.DisplayText = "Web App")

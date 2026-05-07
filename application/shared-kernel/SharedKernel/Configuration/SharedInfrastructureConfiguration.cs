@@ -88,42 +88,44 @@ public static class SharedInfrastructureConfiguration
         }
 
         /// <summary>
-        ///     Register different storage accounts for BlobStorage using .NET Keyed services, when a service needs to access
-        ///     multiple storage accounts. Each connection routes to its own per-SCS endpoint env var (e.g.
-        ///     <c>ACCOUNT_STORAGE_URL</c>),
-        ///     so different SCSs can target different buckets — or different storage backends — without code changes.
+        ///     Registers blob-storage clients as keyed services. All connections share one endpoint
+        ///     (<c>BLOB_STORAGE_URL</c>) — S3 endpoints are regional and host many buckets, so per-SCS
+        ///     isolation is via bucket name (the connection name), not via the endpoint URL.
         /// </summary>
-        public IHostApplicationBuilder AddNamedBlobStorages((string ConnectionName, string EnvironmentVariable)?[] connections)
+        public IHostApplicationBuilder AddNamedBlobStorages(string[] connectionNames)
         {
-            foreach (var connection in connections)
-            {
-                var (connectionName, envVarName) = connection!.Value;
-                var endpoint = Environment.GetEnvironmentVariable(envVarName);
+            var endpoint = Environment.GetEnvironmentVariable("BLOB_STORAGE_URL");
 
-                if (endpoint is null)
+            if (endpoint is null)
+            {
+                // No-op keyed clients for test/build scenarios where the endpoint isn't set.
+                foreach (var connectionName in connectionNames)
                 {
-                    // Register no-op keyed client for test/build scenarios where the endpoint isn't set.
                     builder.Services.TryAddKeyedSingleton<IBlobStorageClient>(connectionName,
                         (sp, _) => new S3BlobStorageClient(new AmazonS3Client(new AmazonS3Config { ServiceURL = "http://localhost:8333", ForcePathStyle = true }), "http://localhost:8333", sp.GetRequiredService<TimeProvider>())
                     );
-                    continue;
                 }
 
-                var s3Config = new AmazonS3Config
-                {
-                    ServiceURL = endpoint,
-                    ForcePathStyle = true,
-                    UseHttp = !IsRunningInCloud && !endpoint.StartsWith("https")
-                };
+                return builder;
+            }
 
-                var s3Client = IsRunningInCloud
-                    ? new AmazonS3Client(
-                        Environment.GetEnvironmentVariable("SCW_ACCESS_KEY"),
-                        Environment.GetEnvironmentVariable("SCW_SECRET_KEY"),
-                        s3Config
-                    )
-                    : new AmazonS3Client(s3Config);
+            var s3Config = new AmazonS3Config
+            {
+                ServiceURL = endpoint,
+                ForcePathStyle = true,
+                UseHttp = !IsRunningInCloud && !endpoint.StartsWith("https")
+            };
 
+            var s3Client = IsRunningInCloud
+                ? new AmazonS3Client(
+                    Environment.GetEnvironmentVariable("SCW_ACCESS_KEY"),
+                    Environment.GetEnvironmentVariable("SCW_SECRET_KEY"),
+                    s3Config
+                )
+                : new AmazonS3Client(s3Config);
+
+            foreach (var connectionName in connectionNames)
+            {
                 builder.Services.AddKeyedSingleton<IBlobStorageClient>(connectionName,
                     (sp, _) => new S3BlobStorageClient(s3Client, endpoint, sp.GetRequiredService<TimeProvider>())
                 );
