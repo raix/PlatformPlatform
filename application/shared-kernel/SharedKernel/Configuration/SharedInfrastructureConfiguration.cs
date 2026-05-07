@@ -92,6 +92,11 @@ public static class SharedInfrastructureConfiguration
         ///     (<c>BLOB_STORAGE_URL</c>) — S3 endpoints are regional and host many buckets, so per-SCS
         ///     isolation is via bucket name (the connection name), not via the endpoint URL.
         /// </summary>
+        /// <remarks>
+        ///     Cross-SCS bucket access is currently prevented only by C# DI keying — every workload's
+        ///     SCW credentials authorise reads + writes to every bucket in the project. Production-grade
+        ///     enforcement (per-workload IAM applications + S3 bucket policies) lands with task #39.
+        /// </remarks>
         public IHostApplicationBuilder AddNamedBlobStorages(string[] connectionNames)
         {
             var endpoint = Environment.GetEnvironmentVariable("BLOB_STORAGE_URL");
