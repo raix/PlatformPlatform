@@ -2,6 +2,8 @@
 
 .NET Aspire hosting package for Scaleway cloud services. Provides resource definitions, local dev containers, deployment pipeline, cost estimation, and data protection policies for EU-sovereign cloud infrastructure.
 
+Version history: [CHANGELOG.md](./CHANGELOG.md). Currently `0.1.0-preview` — minor releases may break API compatibility (`BREAKING:` prefix in the `Changed` section).
+
 ## Quick Start
 
 ```csharp

@@ -120,4 +120,6 @@ Follow these steps when implementing changes:
    - **ALL lint findings are blocking** - CI pipeline fails on any result marked "Issues found"
    - Severity level (note/warning/error) is irrelevant - fix all findings before proceeding
 
+4. If your change touches a shippable library package, update its `CHANGELOG.md` under `[Unreleased]` — see [Package CHANGELOG.md](/.claude/rules/backend/package-changelog.md) for which packages and what counts as a consumer-visible change.
+
 When you see paths like `/[scs-name]/Core/Features/[Feature]/Domain` in rules, replace `[scs-name]` with the specific self-contained system name (e.g., `main`, `account`, `back-office`) and `[Feature]` with the feature name (e.g., `Users`, `Tenants`). A feature is often 1:1 with a domain aggregate.
