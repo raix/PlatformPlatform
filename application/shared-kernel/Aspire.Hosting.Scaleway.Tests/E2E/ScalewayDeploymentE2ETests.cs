@@ -205,6 +205,35 @@ public sealed class ScalewayDeploymentE2ETests : IDisposable
     }
 
     [Fact]
+    public async Task FullDeploy_ContainerShouldDeclareHealthCheck()
+    {
+        // Arrange
+        var environment = CreateEnvironment("staging");
+
+        var container = new ScalewayRdbInstanceResource("my-api");
+        container.Annotations.Add(new PublishAsScalewayContainerAnnotation
+            {
+                Config = new ScalewayContainerPublishConfig { MemoryLimitMb = 256, MaxScale = 1, Port = 8080 }
+            }
+        );
+
+        // Act
+        await ScalewayDeploymentStep.DeployAsync(environment, [container]);
+
+        // Assert — without the health check, Scaleway routes traffic to containers that are
+        // still warming up and serves 503s for the first ~10s of every revision rollout.
+        var containerPost = _mockServer.ReceivedRequests
+            .Where(r => r.Method == "POST")
+            .FirstOrDefault(r => r.Path.Contains("containers") && !r.Path.Contains("namespaces"));
+
+        containerPost.Should().NotBeNull();
+        containerPost.Body.Should().Contain("health_check");
+        containerPost.Body.Should().Contain("/internal-api/live");
+        containerPost.Body.Should().Contain("failure_threshold");
+        containerPost.Body.Should().Contain("interval");
+    }
+
+    [Fact]
     public async Task FullDeploy_ContainerShouldReceiveScalewayCredentialsAsEnvironmentVariables()
     {
         // Arrange

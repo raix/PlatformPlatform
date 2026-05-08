@@ -283,6 +283,12 @@ internal static class ScalewayDeploymentStep
                 port = config.Port,
                 private_network_id = privateNetworkId,
                 environment_variables = environmentVariables,
+                health_check = new
+                {
+                    http = new { path = config.HealthCheckPath },
+                    failure_threshold = config.HealthCheckFailureThreshold,
+                    interval = $"{config.HealthCheckIntervalSeconds}s"
+                },
                 tags = new[] { AspireManagedTag }
             }, cancellationToken
         );

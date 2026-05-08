@@ -29,7 +29,19 @@ public sealed class ScalewayContainerPublishConfig
 
     public string Privacy { get; set; } = "public";
 
-    public string? HealthCheckPath { get; set; }
+    /// <summary>
+    ///     Path that Scaleway hits to decide whether the container is healthy. Scaleway Serverless
+    ///     Containers expose a single check (no separate liveness/readiness), so this points at the
+    ///     simpler self-check (<c>/internal-api/live</c>) — the dependency-aware <c>/internal-api/ready</c>
+    ///     check would let a transient downstream blip take all containers down.
+    /// </summary>
+    public string HealthCheckPath { get; set; } = "/internal-api/live";
+
+    /// <summary>Seconds between Scaleway health-check probes.</summary>
+    public int HealthCheckIntervalSeconds { get; set; } = 30;
+
+    /// <summary>Consecutive failures before Scaleway marks the container unhealthy.</summary>
+    public int HealthCheckFailureThreshold { get; set; } = 3;
 
     public string? RegistryNamespace { get; set; }
 
