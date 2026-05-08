@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using AppHost;
 using Aspire.Hosting.Scaleway;
 using Aspire.Hosting.Scaleway.LocalDev;
+using Aspire.Hosting.Scaleway.Networking;
 using Aspire.Hosting.Scaleway.Provisioning;
 using Aspire.Hosting.Scaleway.Storage;
 using Projects;
@@ -22,12 +23,18 @@ if (!builder.ExecutionContext.IsPublishMode)
 
 SecretManagerHelper.GenerateAuthenticationTokenSigningKey("authentication-token-signing-key");
 
+var profile = EnvironmentProfile.Resolve();
+
 var (googleOAuthConfigured, googleOAuthClientId, googleOAuthClientSecret) = ConfigureGoogleOAuthParameters();
 
 var (stripeConfigured, stripePublishableKey, stripeApiKey, stripeWebhookSecret) = ConfigureStripeParameters();
 var stripeFullyConfigured = stripeConfigured && builder.Configuration["Parameters:stripe-webhook-secret"] is not null and not "not-configured";
 
-builder.AddScalewayEnvironment("scaleway", ScalewayRegion.FrPar);
+var scaleway = builder.AddScalewayEnvironment("scaleway", profile.Region);
+if (profile.MonthlyBudgetEur is { } budget)
+{
+    scaleway.WithMonthlyBudget(budget);
+}
 
 var postgres = builder.AddScalewayRdbInstance("postgres")
     .RunAsPostgresContainer(c => c
@@ -37,9 +44,10 @@ var postgres = builder.AddScalewayRdbInstance("postgres")
     )
     .PublishAsScalewayRdb(c =>
         {
-            c.Engine = "PostgreSQL-16";
-            c.NodeType = "DB-DEV-S";
-            c.VolumeSizeInGb = 10;
+            c.Engine = profile.Rdb.Engine;
+            c.NodeType = profile.Rdb.NodeType;
+            c.VolumeSizeInGb = profile.Rdb.VolumeSizeInGb;
+            c.IsHaCluster = profile.Rdb.IsHaCluster;
         }
     );
 
@@ -61,7 +69,7 @@ var accountWorkers = builder
     .WithReference(accountDatabase)
     .WithS3Storage(objectStorage)
     .WaitFor(accountDatabase)
-    .PublishAsStandardScalewayContainer(5);
+    .PublishAsStandardScalewayContainer(profile.WorkerContainer);
 
 var accountApi = builder
     .AddProject<Account_Api>("account-api")
@@ -70,14 +78,14 @@ var accountApi = builder
     .WithS3Storage(objectStorage)
     .WithEnvironment("OAuth__Google__ClientId", googleOAuthClientId)
     .WithEnvironment("OAuth__Google__ClientSecret", googleOAuthClientSecret)
-    .WithEnvironment("OAuth__AllowMockProvider", "true")
+    .WithEnvironment("OAuth__AllowMockProvider", profile.AllowOAuthMock ? "true" : "false")
     .WithEnvironment("Stripe__SubscriptionEnabled", stripeFullyConfigured ? "true" : "false")
     .WithEnvironment("Stripe__ApiKey", stripeApiKey)
     .WithEnvironment("Stripe__WebhookSecret", stripeWebhookSecret)
     .WithEnvironment("Stripe__PublishableKey", stripePublishableKey)
-    .WithEnvironment("Stripe__AllowMockProvider", "true")
+    .WithEnvironment("Stripe__AllowMockProvider", profile.AllowStripeMock ? "true" : "false")
     .WaitFor(accountWorkers)
-    .PublishAsStandardScalewayContainer(10);
+    .PublishAsStandardScalewayContainer(profile.ApiContainer);
 
 var backOfficeDatabase = postgres.AddDatabase("back-office-database", "back-office");
 
@@ -85,14 +93,14 @@ var backOfficeWorkers = builder
     .AddProject<BackOffice_Workers>("back-office-workers")
     .WithReference(backOfficeDatabase)
     .WaitFor(backOfficeDatabase)
-    .PublishAsStandardScalewayContainer(5);
+    .PublishAsStandardScalewayContainer(profile.WorkerContainer);
 
 var backOfficeApi = builder
     .AddProject<BackOffice_Api>("back-office-api")
     .WithUrlConfiguration("/back-office")
     .WithReference(backOfficeDatabase)
     .WaitFor(backOfficeWorkers)
-    .PublishAsStandardScalewayContainer(10);
+    .PublishAsStandardScalewayContainer(profile.ApiContainer);
 
 var mainDatabase = postgres.AddDatabase("main-database", "main");
 
@@ -100,7 +108,7 @@ var mainWorkers = builder
     .AddProject<Main_Workers>("main-workers")
     .WithReference(mainDatabase)
     .WaitFor(mainDatabase)
-    .PublishAsStandardScalewayContainer(5);
+    .PublishAsStandardScalewayContainer(profile.WorkerContainer);
 
 var mainApi = builder
     .AddProject<Main_Api>("main-api")
@@ -109,7 +117,7 @@ var mainApi = builder
     .WithEnvironment("PUBLIC_GOOGLE_OAUTH_ENABLED", googleOAuthConfigured ? "true" : "false")
     .WithEnvironment("PUBLIC_SUBSCRIPTION_ENABLED", stripeFullyConfigured ? "true" : "false")
     .WaitFor(mainWorkers)
-    .PublishAsStandardScalewayContainer(10);
+    .PublishAsStandardScalewayContainer(profile.ApiContainer);
 
 var appGateway = builder
     .AddProject<AppGateway>("app-gateway")
@@ -121,7 +129,12 @@ var appGateway = builder
     .WaitFor(accountApi)
     .WaitFor(frontendBuild)
     .WithUrlForEndpoint("https", url => url.DisplayText = "Web App")
-    .PublishAsStandardScalewayContainer(10);
+    .PublishAsStandardScalewayContainer(profile.ApiContainer);
+
+if (profile is { IsLocal: false, CustomDomain: { } customDomain })
+{
+    appGateway.WithCustomDomain(customDomain);
+}
 
 appGateway.WithUrl($"{appGateway.GetEndpoint("https")}/back-office", "Back Office");
 appGateway.WithUrl($"{appGateway.GetEndpoint("https")}/openapi", "Open API");

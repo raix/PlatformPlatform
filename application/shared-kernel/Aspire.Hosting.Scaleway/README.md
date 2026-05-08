@@ -248,6 +248,12 @@ This fetches `types.gen.ts` from `scaleway/scaleway-sdk-js` on GitHub, parses `C
 
 ## Environment Variables
 
+### Deploy-time (read at AppHost startup)
+
+| Variable | Purpose |
+|----------|---------|
+| `APPHOST_ENVIRONMENT` | Selects the `EnvironmentProfile` in `application/AppHost/EnvironmentProfile.cs`. One of `local`, `staging`, `production`. Defaults to `local` (preserves zero-config `pp run`). Drives RDB sizing, container scale, custom domain, monthly budget, and OAuth/Stripe mock toggles. |
+
 ### Scaleway credentials (production)
 
 | Variable | Purpose |
@@ -258,6 +264,7 @@ This fetches `types.gen.ts` from `scaleway/scaleway-sdk-js` on GitHub, parses `C
 | `SCW_DEFAULT_REGION` | Default region (e.g., `fr-par`) |
 | `SCW_API_URL` | Scaleway API base URL. Defaults to `https://api.scaleway.com`. Override to point at a mock or proxy. Honored by both the provisioning client and the pricing client. |
 | `SCW_PRICING_CACHE_DISABLED` | Set to `1` to bypass the on-disk pricing cache. The cache lives at `~/.platformplatform/scaleway-pricing-cache-{region}.json` with a 24h TTL. |
+| `SCW_MONTHLY_BUDGET` | Overrides the `WithMonthlyBudget(...)` cap declared in `EnvironmentProfile`. Useful to dial the budget gate up or down without editing AppHost code. |
 
 ### Application secrets (in Scaleway Secret Manager)
 
