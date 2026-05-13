@@ -298,6 +298,10 @@ Two GitHub Actions workflows orchestrate deploys from `main` (`/.github/workflow
 - **`_deploy.yml`** — reusable. Installs the Aspire CLI, logs in to Scaleway Container Registry (`rg.<region>.scw.cloud`), runs `aspire deploy --non-interactive`.
 - **`_migrate-database.yml`** — reusable. Two-stage plan + apply per SCS database. Reads RDB credentials from Scaleway Secret Manager (written by deploy); opens a temporary RDB ACL rule for the runner IP; applies idempotent SQL via `psql`. Worker code keeps its `if (!IsRunningInCloud)` skip-guard — this workflow is the only path that mutates schema in cloud.
 
+### Drift detection
+
+`.github/workflows/drift-detection.yml` runs `aspire deploy` weekly (Monday 06:00 UTC) against production with `SCW_DEPLOY_DRY_RUN=1`. The Scaleway pipeline step produces the plan but exits non-zero if any changes are pending — that's the drift signal. On drift, the workflow appends to (or creates) a tracking issue titled `[drift] production` with the `drift` label.
+
 ### Per-environment configuration
 
 Each GitHub Environment (`staging`, `production`) must define:

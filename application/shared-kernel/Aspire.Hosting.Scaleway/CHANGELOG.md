@@ -23,6 +23,11 @@ may include breaking changes in minor releases; each is called out under `Change
 - `.github/workflows/deploy.yml` — top-level deploy orchestrator. On push to `main`: generates a
   version, fans out per-SCS migrations in parallel, runs `aspire deploy` to staging, then to
   production (production gated by GitHub Environment protection — required reviewers).
+- `.github/workflows/drift-detection.yml` — weekly cron that runs `aspire deploy` against production
+  with `SCW_DEPLOY_DRY_RUN=1` and posts to a `[drift] production` tracking issue on diff.
+- `SCW_DEPLOY_DRY_RUN=1` env var support in `ScalewayPipelineStep` — produces the plan, then exits
+  with `DistributedApplicationException("Drift detected: …")` if any non-`NoChange` entries are
+  pending. Used by the drift-detection workflow.
 
 ## [0.1.0-preview] - 2026-05-08
 

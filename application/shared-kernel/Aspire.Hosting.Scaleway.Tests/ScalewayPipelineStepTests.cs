@@ -106,6 +106,62 @@ public sealed class ScalewayPipelineStepTests : IDisposable
     }
 
     [Fact]
+    public async Task RunAsync_WhenDryRunEnvVarSetAndDriftPending_ThrowsWithoutDeploying()
+    {
+        // Arrange — clean Scaleway state means a fresh deploy would create resources (drift from "nothing applied").
+        var environment = CreateEnvironment("production");
+        var rdb = CreateRdbResource("my-db", new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" });
+
+        Environment.SetEnvironmentVariable("SCW_DEPLOY_DRY_RUN", "1");
+        try
+        {
+            // Act
+            var act = async () => await ScalewayPipelineStep.RunAsync(
+                environment, [rdb], NullLogger.Instance, NoOpSummary, ZeroCostEstimator, CancellationToken.None
+            );
+
+            // Assert — throws so the cron workflow exit code reflects drift, and no POSTs are made.
+            await act.Should().ThrowAsync<DistributedApplicationException>()
+                .Where(ex => ex.Message.Contains("Drift detected"));
+            _mockServer.ReceivedRequests.Where(r => r.Method == "POST").Should().BeEmpty("dry-run must not provision anything");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SCW_DEPLOY_DRY_RUN", null);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenDryRunEnvVarSetAndNoDrift_ExitsCleanlyWithoutDeploying()
+    {
+        // Arrange — first run to provision the resource, then a second dry-run against the same state.
+        var environment = CreateEnvironment("production");
+        var config = new ScalewayRdbPublishConfig { Engine = "PostgreSQL-16", NodeType = "DB-DEV-S" };
+        await ScalewayPipelineStep.RunAsync(
+            environment, [CreateRdbResource("my-db", config)],
+            NullLogger.Instance, NoOpSummary, ZeroCostEstimator, CancellationToken.None
+        );
+        var postsBeforeDryRun = _mockServer.ReceivedRequests.Count(r => r.Method == "POST");
+
+        Environment.SetEnvironmentVariable("SCW_DEPLOY_DRY_RUN", "1");
+        try
+        {
+            // Act — dry-run against already-provisioned state must not throw and must not POST.
+            await ScalewayPipelineStep.RunAsync(
+                environment, [CreateRdbResource("my-db", config)],
+                NullLogger.Instance, NoOpSummary, ZeroCostEstimator, CancellationToken.None
+            );
+
+            // Assert
+            _mockServer.ReceivedRequests.Count(r => r.Method == "POST").Should().Be(postsBeforeDryRun, "dry-run on a converged environment must not POST");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SCW_DEPLOY_DRY_RUN", null);
+        }
+    }
+
+    [Fact]
     public async Task RunAsync_WhenBudgetExceeded_ThrowsBeforeDeploy()
     {
         var environment = CreateEnvironment("production");

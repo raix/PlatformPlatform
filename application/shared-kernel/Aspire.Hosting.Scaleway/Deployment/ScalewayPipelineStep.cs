@@ -106,6 +106,23 @@ internal static class ScalewayPipelineStep
             );
         }
 
+        // Dry-run mode: produce the plan, then exit. Exit code reflects whether actual drift
+        // was found — used by the weekly drift-detection cron to fail-red on diff and post an
+        // alert. NoChange entries don't count as drift.
+        if (Environment.GetEnvironmentVariable("SCW_DEPLOY_DRY_RUN") == "1")
+        {
+            var driftChanges = plan.Changes.Where(c => c.ChangeType != DeploymentChangeType.NoChange).ToArray();
+            if (driftChanges.Length > 0)
+            {
+                throw new DistributedApplicationException(
+                    $"Drift detected in environment '{environment.Name}': {driftChanges.Length} change(s) pending. See plan above."
+                );
+            }
+
+            logger.LogInformation("Dry-run for '{Environment}' complete — no drift.", environment.Name);
+            return;
+        }
+
         await ScalewayDeploymentStep.DeployAsync(environment, publishResources, apiClient, SelectApprover(), cancellationToken);
     }
 
