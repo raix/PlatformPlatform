@@ -9,6 +9,15 @@ may include breaking changes in minor releases; each is called out under `Change
 
 ## [Unreleased]
 
+### Added
+
+- `.github/workflows/_migrate-database.yml` — reusable workflow that runs EF Core migrations against
+  a live Scaleway RDB instance. Two-stage (plan + apply, apply gated by `inputs.apply_migrations`
+  + GitHub Environment protection). Reads RDB credentials from Scaleway Secret Manager (see #26)
+  and manages a temporary RDB ACL rule for the runner IP. Workers keep their `if (!IsRunningInCloud)`
+  skip-guard — this workflow is the only path that mutates schema in cloud, same contract as the
+  original Azure setup.
+
 ## [0.1.0-preview] - 2026-05-08
 
 ### Added
