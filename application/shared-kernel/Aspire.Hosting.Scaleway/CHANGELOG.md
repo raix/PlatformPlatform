@@ -17,6 +17,12 @@ may include breaking changes in minor releases; each is called out under `Change
   and manages a temporary RDB ACL rule for the runner IP. Workers keep their `if (!IsRunningInCloud)`
   skip-guard — this workflow is the only path that mutates schema in cloud, same contract as the
   original Azure setup.
+- `.github/workflows/_deploy.yml` — reusable workflow that runs `aspire deploy` against a Scaleway
+  environment. Installs the Aspire CLI, logs in to Scaleway Container Registry, sets
+  `APPHOST_ENVIRONMENT` so `EnvironmentProfile.Resolve()` picks the right per-env values.
+- `.github/workflows/deploy.yml` — top-level deploy orchestrator. On push to `main`: generates a
+  version, fans out per-SCS migrations in parallel, runs `aspire deploy` to staging, then to
+  production (production gated by GitHub Environment protection — required reviewers).
 
 ## [0.1.0-preview] - 2026-05-08
 

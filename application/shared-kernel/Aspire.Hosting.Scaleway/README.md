@@ -290,6 +290,31 @@ This fetches `types.gen.ts` from `scaleway/scaleway-sdk-js` on GitHub, parses `C
 | `COCKPIT_TOKEN` | Scaleway Cockpit push token |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry collector endpoint |
 
+## CI Deployment
+
+Two GitHub Actions workflows orchestrate deploys from `main` (`/.github/workflows/`):
+
+- **`deploy.yml`** — top-level orchestrator. On push to `main`: generates a version, fans out per-SCS database migrations, runs `aspire deploy` against staging, then production. `workflow_dispatch` also supported.
+- **`_deploy.yml`** — reusable. Installs the Aspire CLI, logs in to Scaleway Container Registry (`rg.<region>.scw.cloud`), runs `aspire deploy --non-interactive`.
+- **`_migrate-database.yml`** — reusable. Two-stage plan + apply per SCS database. Reads RDB credentials from Scaleway Secret Manager (written by deploy); opens a temporary RDB ACL rule for the runner IP; applies idempotent SQL via `psql`. Worker code keeps its `if (!IsRunningInCloud)` skip-guard — this workflow is the only path that mutates schema in cloud.
+
+### Per-environment configuration
+
+Each GitHub Environment (`staging`, `production`) must define:
+
+**Secrets**:
+- `SCW_ACCESS_KEY`
+- `SCW_SECRET_KEY`
+- `SCW_DEFAULT_PROJECT_ID`
+
+**Variables**:
+- `SCW_DEFAULT_REGION` (e.g., `fr-par`)
+- `SCW_MONTHLY_BUDGET` (optional — overrides the value declared in `EnvironmentProfile`)
+
+**Protection rules** (production only): required reviewers + restrict to `main` branch.
+
+The `APPHOST_ENVIRONMENT` env var is set automatically by `_deploy.yml` to match the GitHub Environment name; `EnvironmentProfile.Resolve()` picks `Local` / `Staging` / `Production` accordingly.
+
 ## Manual QA against a real Scaleway project
 
 For first-time rollouts and high-stakes changes, you can step through the deploy and verify each provisioned resource in the Scaleway console before continuing. Two opt-in env vars enable this:

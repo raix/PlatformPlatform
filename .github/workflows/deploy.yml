@@ -1,0 +1,148 @@
+name: Deploy
+
+# Top-level deploy orchestrator. Triggers on push to main and applies the full pipeline:
+#   1. Generate a date-based version (YYYY.M.D.HHMM).
+#   2. Migrate each SCS's database in parallel (gated by GitHub Environment protection per env).
+#   3. Deploy via aspire deploy.
+# Production runs after staging succeeds; required-reviewer rules on the GitHub Environment gate
+# the production stage.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "application/**"
+      - ".github/workflows/deploy.yml"
+      - ".github/workflows/_deploy.yml"
+      - ".github/workflows/_migrate-database.yml"
+      - "!**.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Generate Version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.gen.outputs.version }}
+    steps:
+      - id: gen
+        run: |
+          MINUTE=$(printf "%s" $(date +"%-H%M") | sed 's/^0*//')
+          echo "version=$(date +"%Y.%-m.%-d.")$MINUTE" >> "$GITHUB_OUTPUT"
+
+  # --- STAGING ---
+
+  staging-migrate-account:
+    needs: version
+    uses: ./.github/workflows/_migrate-database.yml
+    secrets: inherit
+    with:
+      environment: staging
+      scaleway_region: fr-par
+      rdb_instance_name: postgres
+      database_name: account
+      relative_project_path: account/Core/Account.csproj
+      relative_startup_project: account/Api/Account.Api.csproj
+      db_context: AccountDbContext
+      apply_migrations: true
+
+  staging-migrate-main:
+    needs: version
+    uses: ./.github/workflows/_migrate-database.yml
+    secrets: inherit
+    with:
+      environment: staging
+      scaleway_region: fr-par
+      rdb_instance_name: postgres
+      database_name: main
+      relative_project_path: main/Core/Main.csproj
+      relative_startup_project: main/Api/Main.Api.csproj
+      db_context: MainDbContext
+      apply_migrations: true
+
+  staging-migrate-back-office:
+    needs: version
+    uses: ./.github/workflows/_migrate-database.yml
+    secrets: inherit
+    with:
+      environment: staging
+      scaleway_region: fr-par
+      rdb_instance_name: postgres
+      database_name: back-office
+      relative_project_path: back-office/Core/BackOffice.csproj
+      relative_startup_project: back-office/Api/BackOffice.Api.csproj
+      db_context: BackOfficeDbContext
+      apply_migrations: true
+
+  staging-deploy:
+    needs:
+      - version
+      - staging-migrate-account
+      - staging-migrate-main
+      - staging-migrate-back-office
+    uses: ./.github/workflows/_deploy.yml
+    secrets: inherit
+    with:
+      environment: staging
+      version: ${{ needs.version.outputs.version }}
+
+  # --- PRODUCTION ---
+  # Gated by GitHub Environment protection rules (required reviewers, branch restrictions)
+  # configured on the "production" environment in the repo settings.
+
+  production-migrate-account:
+    needs: staging-deploy
+    uses: ./.github/workflows/_migrate-database.yml
+    secrets: inherit
+    with:
+      environment: production
+      scaleway_region: fr-par
+      rdb_instance_name: postgres
+      database_name: account
+      relative_project_path: account/Core/Account.csproj
+      relative_startup_project: account/Api/Account.Api.csproj
+      db_context: AccountDbContext
+      apply_migrations: true
+
+  production-migrate-main:
+    needs: staging-deploy
+    uses: ./.github/workflows/_migrate-database.yml
+    secrets: inherit
+    with:
+      environment: production
+      scaleway_region: fr-par
+      rdb_instance_name: postgres
+      database_name: main
+      relative_project_path: main/Core/Main.csproj
+      relative_startup_project: main/Api/Main.Api.csproj
+      db_context: MainDbContext
+      apply_migrations: true
+
+  production-migrate-back-office:
+    needs: staging-deploy
+    uses: ./.github/workflows/_migrate-database.yml
+    secrets: inherit
+    with:
+      environment: production
+      scaleway_region: fr-par
+      rdb_instance_name: postgres
+      database_name: back-office
+      relative_project_path: back-office/Core/BackOffice.csproj
+      relative_startup_project: back-office/Api/BackOffice.Api.csproj
+      db_context: BackOfficeDbContext
+      apply_migrations: true
+
+  production-deploy:
+    needs:
+      - version
+      - production-migrate-account
+      - production-migrate-main
+      - production-migrate-back-office
+    uses: ./.github/workflows/_deploy.yml
+    secrets: inherit
+    with:
+      environment: production
+      version: ${{ needs.version.outputs.version }}
