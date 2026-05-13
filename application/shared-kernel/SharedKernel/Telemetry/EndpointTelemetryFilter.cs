@@ -1,15 +1,11 @@
 using System.Collections.Immutable;
-using Microsoft.ApplicationInsights.Channel;
-using Microsoft.ApplicationInsights.DataContracts;
-using Microsoft.ApplicationInsights.Extensibility;
 
 namespace SharedKernel.Telemetry;
 
 /// <summary>
-///     Filter out telemetry from requests matching excluded paths
+///     Defines excluded paths and file extensions for telemetry filtering
 /// </summary>
-public class EndpointTelemetryFilter(ITelemetryProcessor telemetryProcessor)
-    : ITelemetryProcessor
+public static class EndpointTelemetryFilter
 {
     public static readonly ImmutableHashSet<string> ExcludedPaths = ImmutableHashSet.Create(
         StringComparer.OrdinalIgnoreCase,
@@ -20,26 +16,4 @@ public class EndpointTelemetryFilter(ITelemetryProcessor telemetryProcessor)
         StringComparer.OrdinalIgnoreCase,
         ".js", ".css", ".png", ".jpg", ".ico", ".map", ".svg", ".woff", ".woff2", "webp"
     );
-
-    public void Process(ITelemetry item)
-    {
-        if (item is RequestTelemetry requestTelemetry && (IsExcludedPath(requestTelemetry) || IsExcludedFileExtension(requestTelemetry)))
-        {
-            return;
-        }
-
-        telemetryProcessor.Process(item);
-    }
-
-    private static bool IsExcludedPath(RequestTelemetry requestTelemetry)
-    {
-        var path = requestTelemetry.Url.AbsolutePath;
-        return ExcludedPaths.Any(path.StartsWith);
-    }
-
-    private static bool IsExcludedFileExtension(RequestTelemetry requestTelemetry)
-    {
-        var path = requestTelemetry.Url.AbsolutePath;
-        return ExcludedFileExtensions.Any(path.EndsWith);
-    }
 }

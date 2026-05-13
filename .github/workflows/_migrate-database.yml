@@ -1,34 +1,47 @@
 name: Migrate Database
 
+# Reusable workflow: runs EF Core migrations against a live Scaleway RDB instance.
+# Mirrors the original Azure-era _migrate-database.yml pattern adapted for Scaleway:
+#  - plan-migrations: always runs. Detects pending migrations, generates an idempotent SQL
+#    script with `dotnet ef migrations script`, uploads it as an artifact. Runs on PRs too,
+#    so reviewers see the preview before merging.
+#  - apply-migrations: gated on `inputs.apply_migrations` AND non-empty plan output. Downloads
+#    the script and applies it via `psql`. Goes through the GitHub Environment protection rules
+#    of the target environment (required reviewers, branch restrictions, etc.).
+#
+# The worker startup migration path stays guarded by `if (!IsRunningInCloud)` — in cloud, this
+# workflow is the only path that mutates schema. Same contract the original Azure setup had.
+#
+# Hard prerequisites:
+#  - The RDB instance has been created by `aspire deploy` at least once (this workflow doesn't
+#    bootstrap infra). Fails fast with "instance not found" otherwise.
+#  - RDB credentials are in Scaleway Secret Manager under `rdb-{instance}-host/port/username/password`,
+#    written by the deploy step (per #26).
+
 on:
   workflow_call:
     inputs:
-      azure_environment:
+      environment:
         required: true
-        type: string
-      cluster_location_acronym:
+        type: string  # "staging" | "production"
+      scaleway_region:
         required: true
-        type: string
-      service_principal_id:
+        type: string  # "fr-par"
+      rdb_instance_name:
         required: true
-        type: string
-      subscription_id:
-        required: true
-        type: string
+        type: string  # "postgres" — the Scaleway RDB instance name (matches AppHost naming)
       database_name:
         required: true
-        type: string
+        type: string  # "account" | "main" | "back-office"
       relative_project_path:
-        description: "Relative path to the project containing the migrations"
         required: true
-        type: string
+        type: string  # e.g. "account/Core/Account.csproj"
       relative_startup_project:
-        description: "Relative path to the startup project"
         required: true
-        type: string
+        type: string  # e.g. "account/Api/Account.Api.csproj"
       db_context:
         required: true
-        type: string
+        type: string  # e.g. "AccountDbContext"
       apply_migrations:
         required: true
         type: boolean
@@ -37,8 +50,10 @@ on:
       has_migrations_to_apply:
         value: ${{ jobs.plan-migrations.outputs.has_migrations_to_apply }}
 
+# Two pushes to main / two PRs to the same env / db must serialise — concurrent migrations against
+# the same database are unsafe. cancel-in-progress=false to never abandon a partially-applied script.
 concurrency:
-  group: ${{ inputs.database_name }}-${{ inputs.azure_environment }}-migrations
+  group: migrate-${{ inputs.database_name }}-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
@@ -46,249 +61,205 @@ jobs:
     name: Plan
     runs-on: ubuntu-24.04
     outputs:
-      has_migrations_to_apply: ${{ steps.generate-migration-script.outputs.has_migrations_to_apply }}
-      migration_json: ${{ steps.generate-migration-script.outputs.migration_json }}
+      has_migrations_to_apply: ${{ steps.generate.outputs.has_migrations_to_apply }}
+      rdb_instance_id: ${{ steps.rdb.outputs.instance_id }}
     env:
-      UNIQUE_PREFIX: ${{ vars.UNIQUE_PREFIX }}
-      TENANT_ID: ${{ vars.TENANT_ID }}
-      CLUSTER_RESOURCE_GROUP_NAME: ${{ vars.UNIQUE_PREFIX }}-${{ inputs.azure_environment }}-${{ inputs.cluster_location_acronym }}
-      POSTGRES_SERVER_NAME: ${{ vars.UNIQUE_PREFIX }}-${{ inputs.azure_environment }}-${{ inputs.cluster_location_acronym }}
-      POSTGRES_HOST: ${{ vars.UNIQUE_PREFIX }}-${{ inputs.azure_environment }}-${{ inputs.cluster_location_acronym }}.postgres.database.azure.com
-
+      SCW_ACCESS_KEY: ${{ secrets.SCW_ACCESS_KEY }}
+      SCW_SECRET_KEY: ${{ secrets.SCW_SECRET_KEY }}
+      SCW_DEFAULT_PROJECT_ID: ${{ secrets.SCW_DEFAULT_PROJECT_ID }}
+      SCW_DEFAULT_REGION: ${{ inputs.scaleway_region }}
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v6
-
-      - name: Setup .NET Core SDK
-        uses: actions/setup-dotnet@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
         with:
           global-json-file: application/global.json
 
-      - name: Restore .NET Tools
+      - name: Restore .NET tools
         working-directory: application
         run: dotnet tool restore
 
-      - name: Build Backend Solution
-        working-directory: application
-        run: dotnet build ${{ inputs.relative_startup_project }}
+      - name: Resolve RDB instance + credentials from Scaleway
+        id: rdb
+        run: |
+          set -euo pipefail
 
-      - name: Login to Azure
-        uses: azure/login@v3
-        with:
-          client-id: ${{ inputs.service_principal_id }}
-          tenant-id: ${{ env.TENANT_ID }}
-          subscription-id: ${{ inputs.subscription_id }}
+          # Find the RDB instance by name (it must already exist; aspire deploy creates it).
+          INSTANCE_ID=$(curl -sf -G "https://api.scaleway.com/rdb/v1/regions/${{ inputs.scaleway_region }}/instances" \
+            -H "X-Auth-Token: ${SCW_SECRET_KEY}" \
+            --data-urlencode "project_id=${SCW_DEFAULT_PROJECT_ID}" \
+            --data-urlencode "name=${{ inputs.rdb_instance_name }}" \
+            | jq -r '.instances[] | select(.name == "${{ inputs.rdb_instance_name }}") | .id' | head -n1)
 
-      - name: Open Firewall
-        working-directory: cloud-infrastructure/cluster
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "::error::RDB instance '${{ inputs.rdb_instance_name }}' not found in project ${SCW_DEFAULT_PROJECT_ID} (region ${{ inputs.scaleway_region }}). Run 'aspire deploy' to create infra before running migrations."
+            exit 1
+          fi
+
+          # Fetch credentials from Scaleway Secret Manager (written by the deploy step per #26).
+          fetch_secret() {
+            # secrets-by-name returns the latest_enabled version of a secret directly,
+            # without needing to list-then-fetch by ID.
+            curl -sf -G "https://api.scaleway.com/secret-manager/v1beta1/regions/${{ inputs.scaleway_region }}/secrets-by-name/$1/versions/latest_enabled/access" \
+              -H "X-Auth-Token: ${SCW_SECRET_KEY}" \
+              --data-urlencode "project_id=${SCW_DEFAULT_PROJECT_ID}" \
+              | jq -r '.data' | base64 -d
+          }
+
+          DB_HOST=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-host")
+          DB_PORT=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-port")
+          DB_USER=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-username")
+          DB_PASSWORD=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-password")
+
+          # Mask the password so it never appears in logs.
+          echo "::add-mask::${DB_PASSWORD}"
+
+          {
+            echo "instance_id=${INSTANCE_ID}"
+            echo "db_host=${DB_HOST}"
+            echo "db_port=${DB_PORT}"
+            echo "db_user=${DB_USER}"
+            echo "db_password=${DB_PASSWORD}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open RDB ACL for runner IP
+        id: acl
+        run: |
+          set -euo pipefail
+          RUNNER_IP=$(curl -sf https://api.ipify.org)
+          ACL_RESPONSE=$(curl -sf -X POST "https://api.scaleway.com/rdb/v1/regions/${{ inputs.scaleway_region }}/instances/${{ steps.rdb.outputs.instance_id }}/acls" \
+            -H "X-Auth-Token: ${SCW_SECRET_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"rules\":[{\"ip\":\"${RUNNER_IP}/32\",\"description\":\"GHA migrate plan ${{ github.run_id }}\"}]}")
+          ACL_ID=$(echo "$ACL_RESPONSE" | jq -r '.rules[0].id')
+          echo "acl_id=${ACL_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate migration script
+        id: generate
         env:
-          CLUSTER_RESOURCE_GROUP_NAME: ${{ env.CLUSTER_RESOURCE_GROUP_NAME }}
-          POSTGRES_SERVER_NAME: ${{ env.POSTGRES_SERVER_NAME }}
-          DATABASE_NAME: ${{ inputs.database_name }}
-        run: bash ./firewall.sh open
-
-      - name: Generate Script for Pending Migrations
-        id: generate-migration-script
+          CONNECTION_STRING: "Host=${{ steps.rdb.outputs.db_host }};Port=${{ steps.rdb.outputs.db_port }};Database=${{ inputs.database_name }};Username=${{ steps.rdb.outputs.db_user }};Password=${{ steps.rdb.outputs.db_password }};Ssl Mode=VerifyFull;"
         working-directory: application
         run: |
-          ENTRA_USER=$(az postgres flexible-server microsoft-entra-admin list --resource-group ${{ env.CLUSTER_RESOURCE_GROUP_NAME }} --server-name ${{ env.POSTGRES_SERVER_NAME }} --query "[0].principalName" --output tsv)
-          CONNECTION_STRING="Host=${{ env.POSTGRES_HOST }};Database=${{ inputs.database_name }};Username=$ENTRA_USER;Password=$(az account get-access-token --resource-type oss-rdbms --query accessToken --output tsv);Ssl Mode=VerifyFull;"
-          
-          echo "Checking for pending migrations..."
-          MIGRATION_INFO=$(dotnet ef migrations list \
+          set -euo pipefail
+          MIGRATIONS_JSON=$(dotnet ef migrations list \
             --project ${{ inputs.relative_project_path }} \
             --startup-project ${{ inputs.relative_startup_project }} \
             --context ${{ inputs.db_context }} \
-            --connection "$CONNECTION_STRING" \
+            --connection "${CONNECTION_STRING}" \
             --no-build \
-            --json)
-          
-          MIGRATION_JSON=$(echo "$MIGRATION_INFO" | sed -n '/^[{[]/,$p')
-          PENDING_MIGRATIONS_JSON=$(echo "$MIGRATION_JSON" | jq '[.[] | select(.applied == false)]')
-          PENDING_MIGRATIONS_COUNT=$(echo "$PENDING_MIGRATIONS_JSON" | jq '. | length')
-          LAST_APPLIED_MIGRATION=$(echo "$MIGRATION_JSON" | jq -r '[.[] | select(.applied == true) | .id] | sort | last // "0"')
-          
-          if [ "$PENDING_MIGRATIONS_COUNT" -gt "0" ]; then
-            LAST_PENDING_MIGRATION=$(echo "$PENDING_MIGRATIONS_JSON" | jq -r '.[-1].id')
-            echo "$PENDING_MIGRATIONS_COUNT pending migration(s) detected:"
-            echo "$PENDING_MIGRATIONS_JSON"
-            echo "Generating migration script from $LAST_APPLIED_MIGRATION to $LAST_PENDING_MIGRATION..."
+            --json | sed -n '/^[{[]/,$p')
 
-            dotnet ef migrations script \
-              "$LAST_APPLIED_MIGRATION" "$LAST_PENDING_MIGRATION" \
-              --project ${{ inputs.relative_project_path }} \
-              --startup-project ${{ inputs.relative_startup_project }} \
-              --context ${{ inputs.db_context }} \
-              --idempotent \
-              --no-build \
-              --output migration.sql
-            
-            echo "has_migrations_to_apply=true" >> $GITHUB_OUTPUT
-            
-            echo "migration_script<<EOF" >> $GITHUB_OUTPUT
-            cat migration.sql >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            
-            echo "migration_json<<EOF" >> $GITHUB_OUTPUT
-            echo "$PENDING_MIGRATIONS_JSON" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "No pending migrations detected."
-            echo "Here is a list of all migrations:"
-            echo "$MIGRATION_JSON"
-            echo "has_migrations_to_apply=false" >> $GITHUB_OUTPUT
+          PENDING_COUNT=$(echo "${MIGRATIONS_JSON}" | jq '[.[] | select(.applied == false)] | length')
+
+          if [ "${PENDING_COUNT}" -eq 0 ]; then
+            echo "No pending migrations."
+            echo "has_migrations_to_apply=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-      - name: Close Firewall
-        if: always()
-        working-directory: cloud-infrastructure/cluster
-        env:
-          CLUSTER_RESOURCE_GROUP_NAME: ${{ env.CLUSTER_RESOURCE_GROUP_NAME }}
-          POSTGRES_SERVER_NAME: ${{ env.POSTGRES_SERVER_NAME }}
-          DATABASE_NAME: ${{ inputs.database_name }}
-        run: bash ./firewall.sh close
+          LAST_APPLIED=$(echo "${MIGRATIONS_JSON}" | jq -r '[.[] | select(.applied == true) | .id] | sort | last // "0"')
+          LAST_PENDING=$(echo "${MIGRATIONS_JSON}" | jq -r '.[-1].id')
 
-      - name: Upload Migration Script
-        if: steps.generate-migration-script.outputs.has_migrations_to_apply == 'true'
+          dotnet ef migrations script "${LAST_APPLIED}" "${LAST_PENDING}" \
+            --project ${{ inputs.relative_project_path }} \
+            --startup-project ${{ inputs.relative_startup_project }} \
+            --context ${{ inputs.db_context }} \
+            --idempotent \
+            --no-build \
+            --output migration.sql
+
+          echo "${PENDING_COUNT} pending migration(s); SQL script written to application/migration.sql"
+          echo "has_migrations_to_apply=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload migration script artifact
+        if: steps.generate.outputs.has_migrations_to_apply == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: migration-script-${{ inputs.azure_environment }}-${{ inputs.cluster_location_acronym }}
+          name: migration-script-${{ inputs.environment }}-${{ inputs.database_name }}
           path: application/migration.sql
 
-      - name: Generate Migration Information
-        id: migration-info
-        if: steps.generate-migration-script.outputs.has_migrations_to_apply == 'true'
-        uses: actions/github-script@v8
-        env:
-          MIGRATION_JSON: ${{ steps.generate-migration-script.outputs.migration_json }}
-          MIGRATION_SCRIPT: ${{ steps.generate-migration-script.outputs.migration_script }}
-        with:
-          script: |
-            const migrationJson = JSON.parse(process.env.MIGRATION_JSON);
-            
-            const migrationsList = migrationJson.map(m => `- ${m.name} (${m.id})`).join('\n');
-            
-            const migrationInfo = `## Approve Database Migration \`${{ inputs.database_name }}\` database on \`${{ inputs.azure_environment }}\`
-            
-            The following pending migration(s) will be applied to the database when approved:
-            ${migrationsList}
-            
-            ### Migration Script
-            \`\`\`sql
-            ${process.env.MIGRATION_SCRIPT}
-            \`\`\`
-            `;
-            
-            console.log(migrationInfo);
-            
-            core.setOutput('markdown', migrationInfo);
-
-      - name: Add Migration Information to Pull Request
-        if: github.event_name == 'pull_request' && steps.generate-migration-script.outputs.has_migrations_to_apply == 'true'
-        uses: actions/github-script@v8
-        env:
-          MIGRATION_INFO: ${{ steps.migration-info.outputs.markdown }}
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            // Delete previous migration info comments for this specific database
-            const comments = await github.rest.issues.listComments({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100
-            });
-
-            const MIGRATION_HEADER = '## Approve Database Migration `${{ inputs.database_name }}` database on `${{ inputs.azure_environment }}`';
-
-            for (const comment of comments.data) {
-              if (comment.body && comment.body.startsWith(MIGRATION_HEADER)) {
-                await github.rest.issues.deleteComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: comment.id
-                });
-              }
-            }
-
-            // Add the new migration info comment
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: process.env.MIGRATION_INFO
-            });
-
-      - name: Add Migration Information to Summary
-        if: steps.generate-migration-script.outputs.has_migrations_to_apply == 'true' && inputs.azure_environment == 'prod'
-        uses: actions/github-script@v8
-        env:
-          MIGRATION_INFO: ${{ steps.migration-info.outputs.markdown }}
-        with:
-          script: core.summary.addRaw(process.env.MIGRATION_INFO).write();
+      - name: Close RDB ACL
+        if: always() && steps.acl.outputs.acl_id != ''
+        run: |
+          curl -sf -X DELETE "https://api.scaleway.com/rdb/v1/regions/${{ inputs.scaleway_region }}/instances/${{ steps.rdb.outputs.instance_id }}/acls/${{ steps.acl.outputs.acl_id }}" \
+            -H "X-Auth-Token: ${SCW_SECRET_KEY}"
 
   apply-migrations:
-    name: Deploy
+    name: Apply
     needs: plan-migrations
     if: needs.plan-migrations.outputs.has_migrations_to_apply == 'true' && inputs.apply_migrations
     runs-on: ubuntu-24.04
-    environment:
-      name: ${{ inputs.azure_environment == 'prod' && 'production' || 'staging' }}
-      url: ${{ format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
-
+    environment: ${{ inputs.environment }}
     env:
-      UNIQUE_PREFIX: ${{ vars.UNIQUE_PREFIX }}
-      TENANT_ID: ${{ vars.TENANT_ID }}
-      CLUSTER_RESOURCE_GROUP_NAME: ${{ vars.UNIQUE_PREFIX }}-${{ inputs.azure_environment }}-${{ inputs.cluster_location_acronym }}
-      POSTGRES_SERVER_NAME: ${{ vars.UNIQUE_PREFIX }}-${{ inputs.azure_environment }}-${{ inputs.cluster_location_acronym }}
-      POSTGRES_HOST: ${{ vars.UNIQUE_PREFIX }}-${{ inputs.azure_environment }}-${{ inputs.cluster_location_acronym }}.postgres.database.azure.com
-
+      SCW_ACCESS_KEY: ${{ secrets.SCW_ACCESS_KEY }}
+      SCW_SECRET_KEY: ${{ secrets.SCW_SECRET_KEY }}
+      SCW_DEFAULT_PROJECT_ID: ${{ secrets.SCW_DEFAULT_PROJECT_ID }}
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
-      - name: Login to Azure
-        uses: azure/login@v3
-        with:
-          client-id: ${{ inputs.service_principal_id }}
-          tenant-id: ${{ env.TENANT_ID }}
-          subscription-id: ${{ inputs.subscription_id }}
-
-      - name: Download Migration Script
-        uses: actions/download-artifact@v8
-        with:
-          name: migration-script-${{ inputs.azure_environment }}-${{ inputs.cluster_location_acronym }}
-          path: .
-
-      - name: Install PostgreSQL Client
+      - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: Open Firewall
-        working-directory: cloud-infrastructure/cluster
-        env:
-          CLUSTER_RESOURCE_GROUP_NAME: ${{ env.CLUSTER_RESOURCE_GROUP_NAME }}
-          POSTGRES_SERVER_NAME: ${{ env.POSTGRES_SERVER_NAME }}
-          DATABASE_NAME: ${{ inputs.database_name }}
-        run: bash ./firewall.sh open
+      - uses: actions/download-artifact@v8
+        with:
+          name: migration-script-${{ inputs.environment }}-${{ inputs.database_name }}
 
-      - name: Apply Migrations
+      - name: Resolve RDB credentials from Scaleway
+        id: rdb
         run: |
-          echo "Applying migrations to ${{ inputs.database_name }} database on ${{ env.POSTGRES_HOST }}..."
-          ACCESS_TOKEN=$(az account get-access-token --resource-type oss-rdbms --query accessToken --output tsv)
-          ENTRA_USER=$(az postgres flexible-server microsoft-entra-admin list --resource-group ${{ env.CLUSTER_RESOURCE_GROUP_NAME }} --server-name ${{ env.POSTGRES_SERVER_NAME }} --query "[0].principalName" --output tsv)
-          PGPASSWORD=$ACCESS_TOKEN psql -v ON_ERROR_STOP=1 "host=${{ env.POSTGRES_HOST }} dbname=${{ inputs.database_name }} user='$ENTRA_USER' sslmode=verify-full sslrootcert=system" -f migration.sql
-          echo "Migrations applied successfully!"
+          set -euo pipefail
+          fetch_secret() {
+            # secrets-by-name returns the latest_enabled version of a secret directly,
+            # without needing to list-then-fetch by ID.
+            curl -sf -G "https://api.scaleway.com/secret-manager/v1beta1/regions/${{ inputs.scaleway_region }}/secrets-by-name/$1/versions/latest_enabled/access" \
+              -H "X-Auth-Token: ${SCW_SECRET_KEY}" \
+              --data-urlencode "project_id=${SCW_DEFAULT_PROJECT_ID}" \
+              | jq -r '.data' | base64 -d
+          }
 
-      - name: Display Migration Summary
+          DB_HOST=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-host")
+          DB_PORT=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-port")
+          DB_USER=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-username")
+          DB_PASSWORD=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-password")
+
+          echo "::add-mask::${DB_PASSWORD}"
+
+          {
+            echo "db_host=${DB_HOST}"
+            echo "db_port=${DB_PORT}"
+            echo "db_user=${DB_USER}"
+            echo "db_password=${DB_PASSWORD}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open RDB ACL for runner IP
+        id: acl
+        run: |
+          set -euo pipefail
+          RUNNER_IP=$(curl -sf https://api.ipify.org)
+          ACL_RESPONSE=$(curl -sf -X POST "https://api.scaleway.com/rdb/v1/regions/${{ inputs.scaleway_region }}/instances/${{ needs.plan-migrations.outputs.rdb_instance_id }}/acls" \
+            -H "X-Auth-Token: ${SCW_SECRET_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"rules\":[{\"ip\":\"${RUNNER_IP}/32\",\"description\":\"GHA migrate apply ${{ github.run_id }}\"}]}")
+          ACL_ID=$(echo "$ACL_RESPONSE" | jq -r '.rules[0].id')
+          echo "acl_id=${ACL_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Apply migrations
+        env:
+          PGPASSWORD: ${{ steps.rdb.outputs.db_password }}
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 \
+            "host=${{ steps.rdb.outputs.db_host }} port=${{ steps.rdb.outputs.db_port }} dbname=${{ inputs.database_name }} user=${{ steps.rdb.outputs.db_user }} sslmode=verify-full" \
+            -f migration.sql
+
+      - name: Job summary
+        if: success()
         uses: actions/github-script@v8
         with:
-          script: core.summary.addRaw(`✅ Migrations successfully applied to \`${{ inputs.database_name }}\` database on \`${{ inputs.azure_environment }}\`.`).write();
+          script: |
+            core.summary.addRaw(`Migrations applied to \`${{ inputs.database_name }}\` on \`${{ inputs.environment }}\`.`).write();
 
-      - name: Close Firewall
-        if: always()
-        working-directory: cloud-infrastructure/cluster
-        env:
-          CLUSTER_RESOURCE_GROUP_NAME: ${{ env.CLUSTER_RESOURCE_GROUP_NAME }}
-          POSTGRES_SERVER_NAME: ${{ env.POSTGRES_SERVER_NAME }}
-          DATABASE_NAME: ${{ inputs.database_name }}
-        run: bash ./firewall.sh close
+      - name: Close RDB ACL
+        if: always() && steps.acl.outputs.acl_id != ''
+        run: |
+          curl -sf -X DELETE "https://api.scaleway.com/rdb/v1/regions/${{ inputs.scaleway_region }}/instances/${{ needs.plan-migrations.outputs.rdb_instance_id }}/acls/${{ steps.acl.outputs.acl_id }}" \
+            -H "X-Auth-Token: ${SCW_SECRET_KEY}"

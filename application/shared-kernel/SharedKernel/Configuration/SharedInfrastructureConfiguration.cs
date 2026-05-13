@@ -1,17 +1,10 @@
-using Azure.Core;
-using Azure.Extensions.AspNetCore.Configuration.Secrets;
-using Azure.Identity;
-using Azure.Monitor.OpenTelemetry.AspNetCore;
-using Azure.Security.KeyVault.Secrets;
-using Azure.Storage.Blobs;
-using Microsoft.ApplicationInsights.AspNetCore.Extensions;
-using Microsoft.ApplicationInsights.Extensibility;
+using Amazon.S3;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Npgsql;
 using OpenTelemetry.Instrumentation.AspNetCore;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -23,16 +16,30 @@ namespace SharedKernel.Configuration;
 
 public static class SharedInfrastructureConfiguration
 {
-    public static readonly bool IsRunningInAzure = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID") is not null;
+    public static readonly bool IsRunningInCloud = Environment.GetEnvironmentVariable("SCW_SECRET_KEY") is not null;
 
-    public static DefaultAzureCredential DefaultAzureCredential => GetDefaultAzureCredential();
-
-    private static DefaultAzureCredential GetDefaultAzureCredential()
+    /// <summary>
+    ///     Assembles a Postgres connection string from secrets surfaced by Scaleway Secret Manager.
+    ///     The deploy step writes <c>rdb-{instance}-host/port/username/password</c> per RDB instance;
+    ///     <see cref="ScalewaySecretManagerConfigurationProvider" /> loads them into <see cref="IConfiguration" />
+    ///     under their literal secret names. The platform currently has one shared RDB instance named
+    ///     <c>postgres</c> with N databases on it; the connection name (e.g. <c>account-database</c>)
+    ///     maps to a database name by stripping the trailing <c>-database</c> if present.
+    /// </summary>
+    private static string AssembleScalewayRdbConnectionString(IConfiguration configuration, string connectionName)
     {
-        // Hack: Remove trailing whitespace from the environment variable, added in Bicep to workaround issue #157.
-        var managedIdentityClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID")!.Trim();
-        var credentialOptions = new DefaultAzureCredentialOptions { ManagedIdentityClientId = managedIdentityClientId };
-        return new DefaultAzureCredential(credentialOptions);
+        const string rdbInstance = "postgres";
+        var databaseName = connectionName.EndsWith("-database") ? connectionName[..^"-database".Length] : connectionName;
+
+        var host = configuration[$"rdb-{rdbInstance}-host"]
+                   ?? throw new InvalidOperationException($"Missing Secret Manager value 'rdb-{rdbInstance}-host'. Has the deploy step run against this environment?");
+        var port = configuration[$"rdb-{rdbInstance}-port"] ?? "5432";
+        var username = configuration[$"rdb-{rdbInstance}-username"]
+                       ?? throw new InvalidOperationException($"Missing Secret Manager value 'rdb-{rdbInstance}-username'.");
+        var password = configuration[$"rdb-{rdbInstance}-password"]
+                       ?? throw new InvalidOperationException($"Missing Secret Manager value 'rdb-{rdbInstance}-password'.");
+
+        return $"Host={host};Port={port};Database={databaseName};Username={username};Password={password};Ssl Mode=VerifyFull;";
     }
 
     extension(IHostApplicationBuilder builder)
@@ -40,15 +47,18 @@ public static class SharedInfrastructureConfiguration
         public IHostApplicationBuilder AddSharedInfrastructure<T>(string connectionName)
             where T : DbContext
         {
+            if (IsRunningInCloud)
+            {
+                builder.Configuration.AddScalewaySecretManager(reloadInterval: TimeSpan.FromMinutes(1));
+            }
+
             builder
-                .AddAzureKeyVaultConfiguration()
                 .ConfigureDatabaseContext<T>(connectionName)
-                .AddDefaultBlobStorage()
                 .AddConfigureOpenTelemetry()
                 .AddOpenTelemetryExporters();
 
             builder.Services
-                .AddApplicationInsightsTelemetry()
+                .AddScoped<OpenTelemetryEnricher>()
                 .ConfigureHttpClientDefaults(http =>
                     {
                         http.AddStandardResilienceHandler(); // Turn on resilience by default
@@ -62,102 +72,68 @@ public static class SharedInfrastructureConfiguration
 
     extension(IHostApplicationBuilder builder)
     {
-        private IHostApplicationBuilder AddAzureKeyVaultConfiguration()
-        {
-            if (IsRunningInAzure)
-            {
-                var keyVaultUri = new Uri(Environment.GetEnvironmentVariable("KEYVAULT_URL")!);
-                var secretClient = new SecretClient(keyVaultUri, DefaultAzureCredential);
-
-                builder.Configuration.AddAzureKeyVault(secretClient, new AzureKeyVaultConfigurationOptions
-                    {
-                        Manager = new KeyVaultSecretManager(),
-                        ReloadInterval = TimeSpan.FromMinutes(1)
-                    }
-                );
-            }
-
-            return builder;
-        }
-
         private IHostApplicationBuilder ConfigureDatabaseContext<T>(string connectionName)
             where T : DbContext
         {
-            var connectionString = IsRunningInAzure
-                ? Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING")
+            // Scaleway RDB and local dev both use standard connection strings
+            var connectionString = IsRunningInCloud
+                ? AssembleScalewayRdbConnectionString(builder.Configuration, connectionName)
                 : builder.Configuration.GetConnectionString(connectionName);
 
-            if (IsRunningInAzure)
-            {
-                var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-                dataSourceBuilder.UsePeriodicPasswordProvider(async (_, cancellationToken) =>
-                    {
-                        var token = await DefaultAzureCredential.GetTokenAsync(new TokenRequestContext(["https://ossrdbms-aad.database.windows.net/.default"]), cancellationToken);
-                        return token.Token;
-                    }, TimeSpan.FromMinutes(30), TimeSpan.FromSeconds(5)
-                );
-                var dataSource = dataSourceBuilder.Build();
-                builder.Services.AddSingleton(dataSource);
-                builder.Services.AddDbContext<T>(options =>
-                    options.UseNpgsql(dataSource, o => o.MigrationsHistoryTable("__ef_migrations_history")).UseSnakeCaseNamingConvention()
-                );
-            }
-            else
-            {
-                builder.Services.AddDbContext<T>(options =>
-                    options.UseNpgsql(connectionString, o => o.MigrationsHistoryTable("__ef_migrations_history")).UseSnakeCaseNamingConvention()
-                );
-            }
-
-            return builder;
-        }
-
-        private IHostApplicationBuilder AddDefaultBlobStorage()
-        {
-            // Register the default storage account for BlobStorage
-            if (IsRunningInAzure)
-            {
-                var defaultBlobStorageUri = new Uri(Environment.GetEnvironmentVariable("BLOB_STORAGE_URL")!);
-                builder.Services.AddSingleton<IBlobStorageClient>(sp =>
-                    new BlobStorageClient(new BlobServiceClient(defaultBlobStorageUri, DefaultAzureCredential), sp.GetRequiredService<TimeProvider>())
-                );
-            }
-            else
-            {
-                var connectionString = builder.Configuration.GetConnectionString("blob-storage");
-                builder.Services.AddSingleton<IBlobStorageClient>(sp =>
-                    new BlobStorageClient(new BlobServiceClient(connectionString), sp.GetRequiredService<TimeProvider>())
-                );
-            }
+            builder.Services.AddDbContext<T>(options =>
+                options.UseNpgsql(connectionString, o => o.MigrationsHistoryTable("__ef_migrations_history")).UseSnakeCaseNamingConvention()
+            );
 
             return builder;
         }
 
         /// <summary>
-        ///     Register different storage accounts for BlobStorage using .NET Keyed services, when a service needs to access
-        ///     multiple storage accounts.
+        ///     Registers blob-storage clients as keyed services. All connections share one endpoint
+        ///     (<c>BLOB_STORAGE_URL</c>) — S3 endpoints are regional and host many buckets, so per-SCS
+        ///     isolation is via bucket name (the connection name), not via the endpoint URL.
         /// </summary>
-        public IHostApplicationBuilder AddNamedBlobStorages((string ConnectionName, string EnvironmentVariable)?[] connections)
+        /// <remarks>
+        ///     Cross-SCS bucket access is currently prevented only by C# DI keying — every workload's
+        ///     SCW credentials authorise reads + writes to every bucket in the project. Production-grade
+        ///     enforcement (per-workload IAM applications + S3 bucket policies) lands with task #39.
+        /// </remarks>
+        public IHostApplicationBuilder AddNamedBlobStorages(string[] connectionNames)
         {
-            if (IsRunningInAzure)
+            var endpoint = Environment.GetEnvironmentVariable("BLOB_STORAGE_URL");
+
+            if (endpoint is null)
             {
-                foreach (var connection in connections)
+                // No-op keyed clients for test/build scenarios where the endpoint isn't set.
+                foreach (var connectionName in connectionNames)
                 {
-                    var storageEndpointUri = new Uri(Environment.GetEnvironmentVariable(connection!.Value.EnvironmentVariable)!);
-                    builder.Services.AddKeyedSingleton<IBlobStorageClient>(connection.Value.ConnectionName,
-                        (sp, _) => new BlobStorageClient(new BlobServiceClient(storageEndpointUri, DefaultAzureCredential), sp.GetRequiredService<TimeProvider>())
+                    builder.Services.TryAddKeyedSingleton<IBlobStorageClient>(connectionName,
+                        (sp, _) => new S3BlobStorageClient(new AmazonS3Client(new AmazonS3Config { ServiceURL = "http://localhost:8333", ForcePathStyle = true }), "http://localhost:8333", sp.GetRequiredService<TimeProvider>())
                     );
                 }
+
+                return builder;
             }
-            else
+
+            var s3Config = new AmazonS3Config
             {
-                var connectionString = builder.Configuration.GetConnectionString("blob-storage");
-                foreach (var connection in connections)
-                {
-                    builder.Services.AddKeyedSingleton<IBlobStorageClient>(connection!.Value.ConnectionName,
-                        (sp, _) => new BlobStorageClient(new BlobServiceClient(connectionString), sp.GetRequiredService<TimeProvider>())
-                    );
-                }
+                ServiceURL = endpoint,
+                ForcePathStyle = true,
+                UseHttp = !IsRunningInCloud && !endpoint.StartsWith("https")
+            };
+
+            var s3Client = IsRunningInCloud
+                ? new AmazonS3Client(
+                    Environment.GetEnvironmentVariable("SCW_ACCESS_KEY"),
+                    Environment.GetEnvironmentVariable("SCW_SECRET_KEY"),
+                    s3Config
+                )
+                : new AmazonS3Client(s3Config);
+
+            foreach (var connectionName in connectionNames)
+            {
+                builder.Services.AddKeyedSingleton<IBlobStorageClient>(connectionName,
+                    (sp, _) => new S3BlobStorageClient(s3Client, endpoint, sp.GetRequiredService<TimeProvider>())
+                );
             }
 
             return builder;
@@ -226,41 +202,7 @@ public static class SharedInfrastructureConfiguration
                     .ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddOtlpExporter());
             }
 
-            builder.Services.AddOpenTelemetry().UseAzureMonitor(options =>
-                {
-                    options.ConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"] ??
-                                               "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://localhost;LiveEndpoint=https://localhost";
-                }
-            );
-
             return builder;
-        }
-    }
-
-    extension(IServiceCollection services)
-    {
-        private IServiceCollection AddApplicationInsightsTelemetry()
-        {
-            var applicationInsightsServiceOptions = new ApplicationInsightsServiceOptions
-            {
-                EnableQuickPulseMetricStream = false,
-                EnableRequestTrackingTelemetryModule = false,
-                EnableDependencyTrackingTelemetryModule = false,
-                RequestCollectionOptions = { TrackExceptions = false }
-            };
-
-            services
-                .AddApplicationInsightsTelemetry(applicationInsightsServiceOptions)
-                .AddApplicationInsightsTelemetryProcessor<EndpointTelemetryFilter>()
-                .AddScoped<OpenTelemetryEnricher>()
-                .AddSingleton<ITelemetryInitializer, ApplicationInsightsTelemetryInitializer>();
-
-            if (!IsRunningInAzure)
-            {
-                services.AddApplicationInsightsTelemetryProcessor<DevelopmentApplicationInsightsLogger>();
-            }
-
-            return services;
         }
     }
 }

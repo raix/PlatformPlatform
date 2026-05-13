@@ -1,119 +1,123 @@
 using System.Net;
 using System.Net.Sockets;
 using AppHost;
-using Azure.Storage.Blobs;
-using Microsoft.Extensions.Configuration;
+using Aspire.Hosting.Scaleway;
+using Aspire.Hosting.Scaleway.LocalDev;
+using Aspire.Hosting.Scaleway.Networking;
+using Aspire.Hosting.Scaleway.Provisioning;
+using Aspire.Hosting.Scaleway.Storage;
 using Projects;
-
-// Check for port conflicts before starting
-CheckPortAvailability();
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var certificatePassword = await builder.CreateSslCertificateIfNotExists();
+// In publish mode (aspire deploy / aspire publish) the dashboard never runs, so neither the dev
+// HTTPS certificate nor the dashboard ports are needed. Skipping the cert avoids a blocking
+// keychain trust prompt on fresh machines / CI runners; skipping the port check lets parallel
+// E2E test processes coexist.
+var certificatePassword = string.Empty;
+if (!builder.ExecutionContext.IsPublishMode)
+{
+    CheckPortAvailability();
+    certificatePassword = await builder.CreateSslCertificateIfNotExists();
+}
 
 SecretManagerHelper.GenerateAuthenticationTokenSigningKey("authentication-token-signing-key");
+
+var profile = EnvironmentProfile.Resolve();
 
 var (googleOAuthConfigured, googleOAuthClientId, googleOAuthClientSecret) = ConfigureGoogleOAuthParameters();
 
 var (stripeConfigured, stripePublishableKey, stripeApiKey, stripeWebhookSecret) = ConfigureStripeParameters();
 var stripeFullyConfigured = stripeConfigured && builder.Configuration["Parameters:stripe-webhook-secret"] is not null and not "not-configured";
 
-var postgresPassword = builder.CreateStablePassword("postgres-password");
-var postgres = builder.AddPostgres("postgres", password: postgresPassword, port: 9002)
-    .WithDataVolume("platform-platform-postgres-data")
-    .WithLifetime(ContainerLifetime.Persistent)
-    .WithArgs("-c", "wal_level=logical");
+var scaleway = builder.AddScalewayEnvironment("scaleway", profile.Region);
+if (profile.MonthlyBudgetEur is { } budget)
+{
+    scaleway.WithMonthlyBudget(budget);
+}
 
-var azureStorage = builder
-    .AddAzureStorage("azure-storage")
-    .RunAsEmulator(resourceBuilder =>
-        {
-            resourceBuilder.WithDataVolume("platform-platform-azure-storage-data");
-            resourceBuilder.WithBlobPort(10000);
-            resourceBuilder.WithLifetime(ContainerLifetime.Persistent);
-        }
+var postgres = builder.AddScalewayRdbInstance("postgres")
+    .RunAsPostgresContainer(c => c
+        .WithDataVolume("platform-platform-postgres-data")
+        .WithLifetime(ContainerLifetime.Persistent)
+        .WithArgs("-c", "wal_level=logical")
     )
-    .WithAnnotation(new ContainerImageAnnotation
+    .PublishAsScalewayRdb(c =>
         {
-            Registry = "mcr.microsoft.com",
-            Image = "azure-storage/azurite",
-            Tag = "latest"
+            c.Engine = profile.Rdb.Engine;
+            c.NodeType = profile.Rdb.NodeType;
+            c.VolumeSizeInGb = profile.Rdb.VolumeSizeInGb;
+            c.IsHaCluster = profile.Rdb.IsHaCluster;
         }
-    )
-    .AddBlobs("blobs");
+    );
 
-builder
-    .AddContainer("mail-server", "axllent/mailpit")
-    .WithHttpEndpoint(9003, 8025)
-    .WithEndpoint(9004, 1025)
-    .WithLifetime(ContainerLifetime.Persistent)
-    .WithUrlForEndpoint("http", u => u.DisplayText = "Read mail here");
+var objectStorage = builder.AddScalewayObjectStorage("object-storage")
+    .RunAsSeaweedFsContainer(8333)
+    .PublishAsScalewayObjectStorage();
 
-CreateBlobContainer("avatars");
-CreateBlobContainer("logos");
+builder.AddScalewayTemDomain("mail-server")
+    .RunAsMailpitContainer(9003, 9004);
 
 var frontendBuild = builder
     .AddJavaScriptApp("frontend-build", "../")
     .WithEnvironment("CERTIFICATE_PASSWORD", certificatePassword);
 
-var accountDatabase = postgres
-    .AddDatabase("account-database", "account");
+var accountDatabase = postgres.AddDatabase("account-database", "account");
 
 var accountWorkers = builder
     .AddProject<Account_Workers>("account-workers")
     .WithReference(accountDatabase)
-    .WithReference(azureStorage)
-    .WaitFor(accountDatabase);
+    .WithS3Storage(objectStorage)
+    .WaitFor(accountDatabase)
+    .PublishAsStandardScalewayContainer(profile.WorkerContainer);
 
 var accountApi = builder
     .AddProject<Account_Api>("account-api")
     .WithUrlConfiguration("/account")
     .WithReference(accountDatabase)
-    .WithReference(azureStorage)
+    .WithS3Storage(objectStorage)
     .WithEnvironment("OAuth__Google__ClientId", googleOAuthClientId)
     .WithEnvironment("OAuth__Google__ClientSecret", googleOAuthClientSecret)
-    .WithEnvironment("OAuth__AllowMockProvider", "true")
+    .WithEnvironment("OAuth__AllowMockProvider", profile.AllowOAuthMock ? "true" : "false")
     .WithEnvironment("Stripe__SubscriptionEnabled", stripeFullyConfigured ? "true" : "false")
     .WithEnvironment("Stripe__ApiKey", stripeApiKey)
     .WithEnvironment("Stripe__WebhookSecret", stripeWebhookSecret)
     .WithEnvironment("Stripe__PublishableKey", stripePublishableKey)
-    .WithEnvironment("Stripe__AllowMockProvider", "true")
-    .WaitFor(accountWorkers);
+    .WithEnvironment("Stripe__AllowMockProvider", profile.AllowStripeMock ? "true" : "false")
+    .WaitFor(accountWorkers)
+    .PublishAsStandardScalewayContainer(profile.ApiContainer);
 
-var backOfficeDatabase = postgres
-    .AddDatabase("back-office-database", "back-office");
+var backOfficeDatabase = postgres.AddDatabase("back-office-database", "back-office");
 
 var backOfficeWorkers = builder
     .AddProject<BackOffice_Workers>("back-office-workers")
     .WithReference(backOfficeDatabase)
-    .WithReference(azureStorage)
-    .WaitFor(backOfficeDatabase);
+    .WaitFor(backOfficeDatabase)
+    .PublishAsStandardScalewayContainer(profile.WorkerContainer);
 
 var backOfficeApi = builder
     .AddProject<BackOffice_Api>("back-office-api")
     .WithUrlConfiguration("/back-office")
     .WithReference(backOfficeDatabase)
-    .WithReference(azureStorage)
-    .WaitFor(backOfficeWorkers);
+    .WaitFor(backOfficeWorkers)
+    .PublishAsStandardScalewayContainer(profile.ApiContainer);
 
-var mainDatabase = postgres
-    .AddDatabase("main-database", "main");
+var mainDatabase = postgres.AddDatabase("main-database", "main");
 
 var mainWorkers = builder
     .AddProject<Main_Workers>("main-workers")
     .WithReference(mainDatabase)
-    .WithReference(azureStorage)
-    .WaitFor(mainDatabase);
+    .WaitFor(mainDatabase)
+    .PublishAsStandardScalewayContainer(profile.WorkerContainer);
 
 var mainApi = builder
     .AddProject<Main_Api>("main-api")
     .WithUrlConfiguration("")
     .WithReference(mainDatabase)
-    .WithReference(azureStorage)
     .WithEnvironment("PUBLIC_GOOGLE_OAUTH_ENABLED", googleOAuthConfigured ? "true" : "false")
     .WithEnvironment("PUBLIC_SUBSCRIPTION_ENABLED", stripeFullyConfigured ? "true" : "false")
-    .WaitFor(mainWorkers);
+    .WaitFor(mainWorkers)
+    .PublishAsStandardScalewayContainer(profile.ApiContainer);
 
 var appGateway = builder
     .AddProject<AppGateway>("app-gateway")
@@ -121,9 +125,16 @@ var appGateway = builder
     .WithReference(accountApi)
     .WithReference(backOfficeApi)
     .WithReference(mainApi)
+    .WithS3Storage(objectStorage)
     .WaitFor(accountApi)
     .WaitFor(frontendBuild)
-    .WithUrlForEndpoint("https", url => url.DisplayText = "Web App");
+    .WithUrlForEndpoint("https", url => url.DisplayText = "Web App")
+    .PublishAsStandardScalewayContainer(profile.ApiContainer);
+
+if (profile is { IsLocal: false, CustomDomain: { } customDomain })
+{
+    appGateway.WithCustomDomain(customDomain);
+}
 
 appGateway.WithUrl($"{appGateway.GetEndpoint("https")}/back-office", "Back Office");
 appGateway.WithUrl($"{appGateway.GetEndpoint("https")}/openapi", "Open API");
@@ -249,19 +260,6 @@ void AddStripeCliContainer()
     );
 }
 
-void CreateBlobContainer(string containerName)
-{
-    var connectionString = builder.Configuration.GetConnectionString("blob-storage");
-
-    new Task(() =>
-        {
-            var blobServiceClient = new BlobServiceClient(connectionString);
-            var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-            containerClient.CreateIfNotExists();
-        }
-    ).Start();
-}
-
 void CheckPortAvailability()
 {
     var ports = new[] { (9098, "Resource Service"), (9097, "Dashboard"), (9001, "Aspire") };
@@ -269,7 +267,7 @@ void CheckPortAvailability()
 
     if (blocked.Count > 0)
     {
-        Console.WriteLine($"⚠️  Port conflicts: {string.Join(", ", blocked.Select(b => $"{b.Item1} ({b.Item2})"))}");
+        Console.WriteLine($"[WARN] Port conflicts: {string.Join(", ", blocked.Select(b => $"{b.Item1} ({b.Item2})"))}");
         Console.WriteLine("   Services already running. Stop them first using 'run --stop'.");
         Environment.Exit(1);
     }

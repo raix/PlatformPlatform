@@ -16,13 +16,11 @@
         <ProjectReference Include="..\back-office\Workers\BackOffice.Workers.csproj"/>
         <ProjectReference Include="..\main\Api\Main.Api.csproj"/>
         <ProjectReference Include="..\main\Workers\Main.Workers.csproj"/>
+        <ProjectReference Include="..\shared-kernel\Aspire.Hosting.Scaleway\Aspire.Hosting.Scaleway.csproj" IsAspireProjectResource="false"/>
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Aspire.Azure.Storage.Blobs"/>
-        <PackageReference Include="Aspire.Hosting.Azure.Storage"/>
         <PackageReference Include="Aspire.Hosting.JavaScript"/>
-        <PackageReference Include="Aspire.Hosting.PostgreSQL"/>
         <PackageReference Include="Microsoft.Extensions.Configuration"/>
         <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets"/>
     </ItemGroup>

@@ -1,5 +1,3 @@
-using Azure.Storage.Blobs.Models;
-
 namespace SharedKernel.Integrations.BlobStorage;
 
 public interface IBlobStorageClient
@@ -16,5 +14,12 @@ public interface IBlobStorageClient
 
     Uri GetBlobUriWithSharedAccessSignature(string container, string blobName, TimeSpan expiresIn);
 
-    Task CreateContainerIfNotExistsAsync(string containerName, PublicAccessType publicAccessType, CancellationToken cancellationToken);
+    Task CreateContainerIfNotExistsAsync(string containerName, BlobPublicAccessType publicAccessType, CancellationToken cancellationToken);
+}
+
+public enum BlobPublicAccessType
+{
+    None,
+    Container,
+    Blob
 }

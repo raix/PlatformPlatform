@@ -60,7 +60,7 @@ Guidelines for C# backend development, including code style, naming, exceptions,
 - Don't do defensive coding (e.g., don't add exception handling for situations we don't know will happen)
 - Use `user?.IsActive == true` over `user != null && user.IsActive == true`
 - Avoid try-catch unless we cannot fix the root cause—global exception handling covers unknown exceptions
-- Use `SharedInfrastructureConfiguration.IsRunningInAzure` to determine if running in Azure
+- Use `SharedInfrastructureConfiguration.IsRunningInCloud` to determine whether the workload is running in cloud (vs local dev)
 - Inject `TimeProvider` into services and handlers, use `timeProvider.GetUtcNow()` instead of `DateTimeOffset.UtcNow`
 - Pass `DateTimeOffset` values (not `TimeProvider`) to domain methods and aggregates to maintain clean boundaries (e.g., `entity.HasExpired(timeProvider.GetUtcNow())`)
 - Naming rules:
@@ -119,5 +119,7 @@ Follow these steps when implementing changes:
    - Format automatically fixes code style issues according to our conventions
    - **ALL lint findings are blocking** - CI pipeline fails on any result marked "Issues found"
    - Severity level (note/warning/error) is irrelevant - fix all findings before proceeding
+
+4. If your change touches a shippable library package, update its `CHANGELOG.md` under `[Unreleased]` — see [Package CHANGELOG.md](/.claude/rules/backend/package-changelog.md) for which packages and what counts as a consumer-visible change.
 
 When you see paths like `/[scs-name]/Core/Features/[Feature]/Domain` in rules, replace `[scs-name]` with the specific self-contained system name (e.g., `main`, `account`, `back-office`) and `[Feature]` with the feature name (e.g., `Users`, `Tenants`). A feature is often 1:1 with a domain aggregate.

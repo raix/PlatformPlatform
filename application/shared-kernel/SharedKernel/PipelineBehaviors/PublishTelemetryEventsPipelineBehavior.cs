@@ -1,12 +1,15 @@
-using Microsoft.ApplicationInsights;
 using SharedKernel.Cqrs;
 using SharedKernel.Telemetry;
 
 namespace SharedKernel.PipelineBehaviors;
 
+internal static class TelemetryActivitySource
+{
+    public static readonly ActivitySource Instance = new("PlatformPlatform.TelemetryEvents");
+}
+
 public sealed class PublishTelemetryEventsPipelineBehavior<TRequest, TResponse>(
     ITelemetryEventsCollector telemetryEventsCollector,
-    TelemetryClient telemetryClient,
     ConcurrentCommandCounter concurrentCommandCounter,
     ILogger<PublishTelemetryEventsPipelineBehavior<TRequest, TResponse>> logger
 ) : IPipelineBehavior<TRequest, TResponse> where TRequest : ICommand where TResponse : ResultBase
@@ -20,9 +23,18 @@ public sealed class PublishTelemetryEventsPipelineBehavior<TRequest, TResponse>(
             while (telemetryEventsCollector.HasEvents)
             {
                 var telemetryEvent = telemetryEventsCollector.Dequeue();
+                var eventName = telemetryEvent.GetType().Name;
 
-                telemetryClient.TrackEvent(telemetryEvent.GetType().Name, telemetryEvent.Properties);
-                logger.LogInformation("Telemetry: {EventName} {EventProperties}", telemetryEvent.GetType().Name, string.Join(", ", telemetryEvent.Properties.Select(p => $"{p.Key}={p.Value}")));
+                using var activity = TelemetryActivitySource.Instance.StartActivity(eventName);
+                if (activity is not null)
+                {
+                    foreach (var property in telemetryEvent.Properties)
+                    {
+                        activity.SetTag(property.Key, property.Value);
+                    }
+                }
+
+                logger.LogInformation("Telemetry: {EventName} {EventProperties}", eventName, string.Join(", ", telemetryEvent.Properties.Select(p => $"{p.Key}={p.Value}")));
             }
         }
 

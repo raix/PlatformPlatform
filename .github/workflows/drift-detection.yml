@@ -1,0 +1,96 @@
+name: Drift Detection
+
+# Weekly dry-run against production. The Scaleway pipeline step honours SCW_DEPLOY_DRY_RUN=1
+# by producing the plan + cost summary, then exiting non-zero if any actual changes are pending
+# (i.e., production state has drifted from main). On drift, this workflow posts the plan to a
+# tracking issue and fails red so it shows up in the actions overview.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Monday 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  detect:
+    name: Detect drift in production
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      APPHOST_ENVIRONMENT: production
+      SCW_DEPLOY_DRY_RUN: "1"
+      SCW_ACCESS_KEY: ${{ secrets.SCW_ACCESS_KEY }}
+      SCW_SECRET_KEY: ${{ secrets.SCW_SECRET_KEY }}
+      SCW_DEFAULT_PROJECT_ID: ${{ secrets.SCW_DEFAULT_PROJECT_ID }}
+      SCW_DEFAULT_REGION: ${{ vars.SCW_DEFAULT_REGION }}
+      SCW_MONTHLY_BUDGET: ${{ vars.SCW_MONTHLY_BUDGET }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: application/global.json
+
+      - name: Restore .NET tools
+        working-directory: application
+        run: dotnet tool restore
+
+      - name: Install Aspire CLI
+        run: dotnet tool install --global Aspire.Cli
+
+      - name: Run dry-run against production
+        id: plan
+        working-directory: application/AppHost
+        # Capture stdout for the issue body. `aspire deploy` exits non-zero on drift (via the
+        # SCW_DEPLOY_DRY_RUN guard in ScalewayPipelineStep), which becomes our drift signal.
+        run: |
+          set +e
+          aspire deploy --non-interactive --include-exception-details --nologo > plan.log 2>&1
+          EXIT=$?
+          cat plan.log
+          echo "exit_code=${EXIT}" >> "$GITHUB_OUTPUT"
+          if [ ${EXIT} -ne 0 ]; then
+            # Truncate to last 60 lines to keep issue comments readable.
+            tail -n 60 plan.log > plan-tail.log
+            echo "drift_detected=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift_detected=false" >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+
+      - name: Update tracking issue on drift
+        if: steps.plan.outputs.drift_detected == 'true'
+        uses: actions/github-script@v8
+        env:
+          PLAN_TAIL_PATH: application/AppHost/plan-tail.log
+        with:
+          script: |
+            const fs = require('fs');
+            const planTail = fs.readFileSync(process.env.PLAN_TAIL_PATH, 'utf8');
+            const title = '[drift] production';
+            const timestamp = new Date().toISOString();
+            const body = `Drift detected on ${timestamp} (run ${context.runId}).\n\n\`\`\`\n${planTail}\n\`\`\``;
+
+            const { owner, repo } = context.repo;
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, labels: 'drift', state: 'open', per_page: 100
+            });
+            const issue = existing.find(i => i.title === title);
+
+            if (issue) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: issue.number, body });
+            } else {
+              await github.rest.issues.create({
+                owner, repo, title,
+                labels: ['drift'],
+                body
+              });
+            }
+
+      - name: Fail workflow on drift
+        if: steps.plan.outputs.drift_detected == 'true'
+        run: exit 1

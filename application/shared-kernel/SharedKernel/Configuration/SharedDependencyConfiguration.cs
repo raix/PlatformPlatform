@@ -1,7 +1,4 @@
 using System.Text.Json;
-using Azure.Security.KeyVault.Keys;
-using Azure.Security.KeyVault.Keys.Cryptography;
-using Azure.Security.KeyVault.Secrets;
 using FluentValidation;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Json;
@@ -33,20 +30,9 @@ public static class SharedDependencyConfiguration
 
     public static ITokenSigningClient GetTokenSigningService()
     {
-        if (SharedInfrastructureConfiguration.IsRunningInAzure)
+        if (SharedInfrastructureConfiguration.IsRunningInCloud)
         {
-            var keyVaultUri = new Uri(Environment.GetEnvironmentVariable("KEYVAULT_URL")!);
-            var keyClient = new KeyClient(keyVaultUri, SharedInfrastructureConfiguration.DefaultAzureCredential);
-            var cryptographyClient = new CryptographyClient(
-                keyClient.GetKey("authentication-token-signing-key").Value.Id,
-                SharedInfrastructureConfiguration.DefaultAzureCredential
-            );
-
-            var secretClient = new SecretClient(keyVaultUri, SharedInfrastructureConfiguration.DefaultAzureCredential);
-            var issuer = secretClient.GetSecret("authentication-token-issuer").Value.Value;
-            var audience = secretClient.GetSecret("authentication-token-audience").Value.Value;
-
-            return new AzureTokenSigningClient(cryptographyClient, issuer, audience);
+            return new ScalewayTokenSigningClient();
         }
 
         return new DevelopmentTokenSigningClient();
@@ -83,9 +69,9 @@ public static class SharedDependencyConfiguration
             // Configure shared data protection to ensure encrypted data can be shared across all self-contained systems
             var dataProtection = services.AddDataProtection();
 
-            if (!SharedInfrastructureConfiguration.IsRunningInAzure)
+            if (!SharedInfrastructureConfiguration.IsRunningInCloud)
             {
-                // Set a common application name for all self-contained systems for local development (handled automatically by Azure Container Apps Environment)
+                // Set a common application name for all self-contained systems for local development (handled automatically by Scaleway container runtime)
                 dataProtection.SetApplicationName("PlatformPlatform");
             }
 
@@ -141,12 +127,9 @@ public static class SharedDependencyConfiguration
 
         private IServiceCollection AddEmailClient()
         {
-            if (SharedInfrastructureConfiguration.IsRunningInAzure)
+            if (SharedInfrastructureConfiguration.IsRunningInCloud)
             {
-                var keyVaultUri = new Uri(Environment.GetEnvironmentVariable("KEYVAULT_URL")!);
-                services
-                    .AddSingleton(_ => new SecretClient(keyVaultUri, SharedInfrastructureConfiguration.DefaultAzureCredential))
-                    .AddTransient<IEmailClient, AzureEmailClient>();
+                services.AddTransient<IEmailClient, SmtpEmailClient>();
             }
             else
             {
