@@ -1,0 +1,265 @@
+name: Migrate Database
+
+# Reusable workflow: runs EF Core migrations against a live Scaleway RDB instance.
+# Mirrors the original Azure-era _migrate-database.yml pattern adapted for Scaleway:
+#  - plan-migrations: always runs. Detects pending migrations, generates an idempotent SQL
+#    script with `dotnet ef migrations script`, uploads it as an artifact. Runs on PRs too,
+#    so reviewers see the preview before merging.
+#  - apply-migrations: gated on `inputs.apply_migrations` AND non-empty plan output. Downloads
+#    the script and applies it via `psql`. Goes through the GitHub Environment protection rules
+#    of the target environment (required reviewers, branch restrictions, etc.).
+#
+# The worker startup migration path stays guarded by `if (!IsRunningInCloud)` — in cloud, this
+# workflow is the only path that mutates schema. Same contract the original Azure setup had.
+#
+# Hard prerequisites:
+#  - The RDB instance has been created by `aspire deploy` at least once (this workflow doesn't
+#    bootstrap infra). Fails fast with "instance not found" otherwise.
+#  - RDB credentials are in Scaleway Secret Manager under `rdb-{instance}-host/port/username/password`,
+#    written by the deploy step (per #26).
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string  # "staging" | "production"
+      scaleway_region:
+        required: true
+        type: string  # "fr-par"
+      rdb_instance_name:
+        required: true
+        type: string  # "postgres" — the Scaleway RDB instance name (matches AppHost naming)
+      database_name:
+        required: true
+        type: string  # "account" | "main" | "back-office"
+      relative_project_path:
+        required: true
+        type: string  # e.g. "account/Core/Account.csproj"
+      relative_startup_project:
+        required: true
+        type: string  # e.g. "account/Api/Account.Api.csproj"
+      db_context:
+        required: true
+        type: string  # e.g. "AccountDbContext"
+      apply_migrations:
+        required: true
+        type: boolean
+
+    outputs:
+      has_migrations_to_apply:
+        value: ${{ jobs.plan-migrations.outputs.has_migrations_to_apply }}
+
+# Two pushes to main / two PRs to the same env / db must serialise — concurrent migrations against
+# the same database are unsafe. cancel-in-progress=false to never abandon a partially-applied script.
+concurrency:
+  group: migrate-${{ inputs.database_name }}-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  plan-migrations:
+    name: Plan
+    runs-on: ubuntu-24.04
+    outputs:
+      has_migrations_to_apply: ${{ steps.generate.outputs.has_migrations_to_apply }}
+      rdb_instance_id: ${{ steps.rdb.outputs.instance_id }}
+    env:
+      SCW_ACCESS_KEY: ${{ secrets.SCW_ACCESS_KEY }}
+      SCW_SECRET_KEY: ${{ secrets.SCW_SECRET_KEY }}
+      SCW_DEFAULT_PROJECT_ID: ${{ secrets.SCW_DEFAULT_PROJECT_ID }}
+      SCW_DEFAULT_REGION: ${{ inputs.scaleway_region }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: application/global.json
+
+      - name: Restore .NET tools
+        working-directory: application
+        run: dotnet tool restore
+
+      - name: Resolve RDB instance + credentials from Scaleway
+        id: rdb
+        run: |
+          set -euo pipefail
+
+          # Find the RDB instance by name (it must already exist; aspire deploy creates it).
+          INSTANCE_ID=$(curl -sf -G "https://api.scaleway.com/rdb/v1/regions/${{ inputs.scaleway_region }}/instances" \
+            -H "X-Auth-Token: ${SCW_SECRET_KEY}" \
+            --data-urlencode "project_id=${SCW_DEFAULT_PROJECT_ID}" \
+            --data-urlencode "name=${{ inputs.rdb_instance_name }}" \
+            | jq -r '.instances[] | select(.name == "${{ inputs.rdb_instance_name }}") | .id' | head -n1)
+
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "::error::RDB instance '${{ inputs.rdb_instance_name }}' not found in project ${SCW_DEFAULT_PROJECT_ID} (region ${{ inputs.scaleway_region }}). Run 'aspire deploy' to create infra before running migrations."
+            exit 1
+          fi
+
+          # Fetch credentials from Scaleway Secret Manager (written by the deploy step per #26).
+          fetch_secret() {
+            # secrets-by-name returns the latest_enabled version of a secret directly,
+            # without needing to list-then-fetch by ID.
+            curl -sf -G "https://api.scaleway.com/secret-manager/v1beta1/regions/${{ inputs.scaleway_region }}/secrets-by-name/$1/versions/latest_enabled/access" \
+              -H "X-Auth-Token: ${SCW_SECRET_KEY}" \
+              --data-urlencode "project_id=${SCW_DEFAULT_PROJECT_ID}" \
+              | jq -r '.data' | base64 -d
+          }
+
+          DB_HOST=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-host")
+          DB_PORT=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-port")
+          DB_USER=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-username")
+          DB_PASSWORD=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-password")
+
+          # Mask the password so it never appears in logs.
+          echo "::add-mask::${DB_PASSWORD}"
+
+          {
+            echo "instance_id=${INSTANCE_ID}"
+            echo "db_host=${DB_HOST}"
+            echo "db_port=${DB_PORT}"
+            echo "db_user=${DB_USER}"
+            echo "db_password=${DB_PASSWORD}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open RDB ACL for runner IP
+        id: acl
+        run: |
+          set -euo pipefail
+          RUNNER_IP=$(curl -sf https://api.ipify.org)
+          ACL_RESPONSE=$(curl -sf -X POST "https://api.scaleway.com/rdb/v1/regions/${{ inputs.scaleway_region }}/instances/${{ steps.rdb.outputs.instance_id }}/acls" \
+            -H "X-Auth-Token: ${SCW_SECRET_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"rules\":[{\"ip\":\"${RUNNER_IP}/32\",\"description\":\"GHA migrate plan ${{ github.run_id }}\"}]}")
+          ACL_ID=$(echo "$ACL_RESPONSE" | jq -r '.rules[0].id')
+          echo "acl_id=${ACL_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate migration script
+        id: generate
+        env:
+          CONNECTION_STRING: "Host=${{ steps.rdb.outputs.db_host }};Port=${{ steps.rdb.outputs.db_port }};Database=${{ inputs.database_name }};Username=${{ steps.rdb.outputs.db_user }};Password=${{ steps.rdb.outputs.db_password }};Ssl Mode=VerifyFull;"
+        working-directory: application
+        run: |
+          set -euo pipefail
+          MIGRATIONS_JSON=$(dotnet ef migrations list \
+            --project ${{ inputs.relative_project_path }} \
+            --startup-project ${{ inputs.relative_startup_project }} \
+            --context ${{ inputs.db_context }} \
+            --connection "${CONNECTION_STRING}" \
+            --no-build \
+            --json | sed -n '/^[{[]/,$p')
+
+          PENDING_COUNT=$(echo "${MIGRATIONS_JSON}" | jq '[.[] | select(.applied == false)] | length')
+
+          if [ "${PENDING_COUNT}" -eq 0 ]; then
+            echo "No pending migrations."
+            echo "has_migrations_to_apply=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          LAST_APPLIED=$(echo "${MIGRATIONS_JSON}" | jq -r '[.[] | select(.applied == true) | .id] | sort | last // "0"')
+          LAST_PENDING=$(echo "${MIGRATIONS_JSON}" | jq -r '.[-1].id')
+
+          dotnet ef migrations script "${LAST_APPLIED}" "${LAST_PENDING}" \
+            --project ${{ inputs.relative_project_path }} \
+            --startup-project ${{ inputs.relative_startup_project }} \
+            --context ${{ inputs.db_context }} \
+            --idempotent \
+            --no-build \
+            --output migration.sql
+
+          echo "${PENDING_COUNT} pending migration(s); SQL script written to application/migration.sql"
+          echo "has_migrations_to_apply=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload migration script artifact
+        if: steps.generate.outputs.has_migrations_to_apply == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: migration-script-${{ inputs.environment }}-${{ inputs.database_name }}
+          path: application/migration.sql
+
+      - name: Close RDB ACL
+        if: always() && steps.acl.outputs.acl_id != ''
+        run: |
+          curl -sf -X DELETE "https://api.scaleway.com/rdb/v1/regions/${{ inputs.scaleway_region }}/instances/${{ steps.rdb.outputs.instance_id }}/acls/${{ steps.acl.outputs.acl_id }}" \
+            -H "X-Auth-Token: ${SCW_SECRET_KEY}"
+
+  apply-migrations:
+    name: Apply
+    needs: plan-migrations
+    if: needs.plan-migrations.outputs.has_migrations_to_apply == 'true' && inputs.apply_migrations
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
+    env:
+      SCW_ACCESS_KEY: ${{ secrets.SCW_ACCESS_KEY }}
+      SCW_SECRET_KEY: ${{ secrets.SCW_SECRET_KEY }}
+      SCW_DEFAULT_PROJECT_ID: ${{ secrets.SCW_DEFAULT_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: migration-script-${{ inputs.environment }}-${{ inputs.database_name }}
+
+      - name: Resolve RDB credentials from Scaleway
+        id: rdb
+        run: |
+          set -euo pipefail
+          fetch_secret() {
+            # secrets-by-name returns the latest_enabled version of a secret directly,
+            # without needing to list-then-fetch by ID.
+            curl -sf -G "https://api.scaleway.com/secret-manager/v1beta1/regions/${{ inputs.scaleway_region }}/secrets-by-name/$1/versions/latest_enabled/access" \
+              -H "X-Auth-Token: ${SCW_SECRET_KEY}" \
+              --data-urlencode "project_id=${SCW_DEFAULT_PROJECT_ID}" \
+              | jq -r '.data' | base64 -d
+          }
+
+          DB_HOST=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-host")
+          DB_PORT=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-port")
+          DB_USER=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-username")
+          DB_PASSWORD=$(fetch_secret "rdb-${{ inputs.rdb_instance_name }}-password")
+
+          echo "::add-mask::${DB_PASSWORD}"
+
+          {
+            echo "db_host=${DB_HOST}"
+            echo "db_port=${DB_PORT}"
+            echo "db_user=${DB_USER}"
+            echo "db_password=${DB_PASSWORD}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open RDB ACL for runner IP
+        id: acl
+        run: |
+          set -euo pipefail
+          RUNNER_IP=$(curl -sf https://api.ipify.org)
+          ACL_RESPONSE=$(curl -sf -X POST "https://api.scaleway.com/rdb/v1/regions/${{ inputs.scaleway_region }}/instances/${{ needs.plan-migrations.outputs.rdb_instance_id }}/acls" \
+            -H "X-Auth-Token: ${SCW_SECRET_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"rules\":[{\"ip\":\"${RUNNER_IP}/32\",\"description\":\"GHA migrate apply ${{ github.run_id }}\"}]}")
+          ACL_ID=$(echo "$ACL_RESPONSE" | jq -r '.rules[0].id')
+          echo "acl_id=${ACL_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Apply migrations
+        env:
+          PGPASSWORD: ${{ steps.rdb.outputs.db_password }}
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 \
+            "host=${{ steps.rdb.outputs.db_host }} port=${{ steps.rdb.outputs.db_port }} dbname=${{ inputs.database_name }} user=${{ steps.rdb.outputs.db_user }} sslmode=verify-full" \
+            -f migration.sql
+
+      - name: Job summary
+        if: success()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            core.summary.addRaw(`Migrations applied to \`${{ inputs.database_name }}\` on \`${{ inputs.environment }}\`.`).write();
+
+      - name: Close RDB ACL
+        if: always() && steps.acl.outputs.acl_id != ''
+        run: |
+          curl -sf -X DELETE "https://api.scaleway.com/rdb/v1/regions/${{ inputs.scaleway_region }}/instances/${{ needs.plan-migrations.outputs.rdb_instance_id }}/acls/${{ steps.acl.outputs.acl_id }}" \
+            -H "X-Auth-Token: ${SCW_SECRET_KEY}"
