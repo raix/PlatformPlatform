@@ -20,13 +20,14 @@ Guidelines for implementing translations and internationalization in the fronten
    - At runtime, `createFederatedTranslation` merges them: shared underneath, system on top, federated remote (e.g. account loaded into main) on top of that
    - Translate each shared string **once** in the shared catalog, not in every system's catalog
    - Prefer Lingui macros inside `shared-webapp/ui` components over threading translatable text through props -- only accept a text prop when a consumer genuinely needs to override the default (e.g., context-specific wording)
+   - **Disambiguate colliding strings with `context`**: the merged dictionary keys by message ID (a hash of source text **+ `context`**), so identical bare source strings share one translation. When the same word must translate differently by area (e.g. "Account" in the auth flow vs. in the product), add `context` -- either per marker (`<Trans context="auth">Account</Trans>`, `` t({ message: "Account", context: "auth" }) ``) or once for a block/file with a Lingui **Context Directive** (`// lingui-set context="auth"` … `// lingui-reset`; supported by `@lingui/swc-plugin`). `context` feeds the ID hash so both translations coexist in the one dictionary. Don't blanket-namespace a whole system with `context` -- that defeats sharing of genuinely-common strings; use it only where meaning actually diverges
 7. Translation workflow:
    - After adding/changing `<Trans>` or t\`\` markers, the `*.po` files are auto-regenerated on build
    - Don't manually add or remove `msgid` entries -- only translate `msgstr` values
    - After auto-generation, translate all new/updated entries for all supported languages
 8. **Use correct language-specific characters** in translations -- e.g., Danish requires æøå/ÆØÅ, not ae/oe/aa substitutes. Never approximate with ASCII equivalents
 9. Don't translate fully dynamic content such as variable values or dynamic text
-9. **Domain terminology consistency**:
+10. **Domain terminology consistency**:
    - Use consistent terminology throughout the application
    - Before translating, check existing `*.po` files for established domain terms
    - If "Tenant" is used, always use "Tenant" (not "Customer", "Client", "Organization", etc.)
