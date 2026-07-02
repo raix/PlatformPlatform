@@ -2,7 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useIsAuthenticated } from "@repo/infrastructure/auth/hooks";
 import { enhancedFetch } from "@repo/infrastructure/http/httpClient";
-import localeMap from "@repo/infrastructure/translations/i18n.config.json";
+import localeMap from "@repo/infrastructure/translations/i18n.config";
 import { type Locale, translationContext } from "@repo/infrastructure/translations/TranslationContext";
 import { Button } from "@repo/ui/components/Button";
 import {

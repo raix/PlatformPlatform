@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { trackInteraction } from "@repo/infrastructure/applicationInsights/ApplicationInsightsProvider";
 import { preferredLocaleKey } from "@repo/infrastructure/translations/constants";
-import localeMap from "@repo/infrastructure/translations/i18n.config.json";
+import localeMap from "@repo/infrastructure/translations/i18n.config";
 import { type Locale, translationContext } from "@repo/infrastructure/translations/TranslationContext";
 import { MoonStarIcon, SunMoonIcon } from "lucide-react";
 import { useTheme } from "next-themes";

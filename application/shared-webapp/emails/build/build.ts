@@ -10,7 +10,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createElement } from "react";
 
-import i18nConfig from "../../infrastructure/translations/i18n.config.json" with { type: "json" };
+import i18nConfig from "../../infrastructure/translations/i18n.config";
 
 process.env.EMAIL_RENDER_MODE = "build";
 
