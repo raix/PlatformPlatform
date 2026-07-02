@@ -2,6 +2,7 @@ import "@repo/ui/theme.css";
 import "@repo/ui/tailwind.css";
 import { ApplicationInsightsProvider } from "@repo/infrastructure/applicationInsights/ApplicationInsightsProvider";
 import { setupGlobalErrorHandlers } from "@repo/infrastructure/http/globalErrorHandlers";
+import { RepoUiTranslation } from "@repo/infrastructure/translations/RepoUiTranslation";
 import { Translation } from "@repo/infrastructure/translations/Translation";
 import { Toaster } from "@repo/ui/components/Sonner";
 import { RouterProvider } from "@tanstack/react-router";
@@ -25,10 +26,12 @@ setupGlobalErrorHandlers();
 reactDom.createRoot(rootElement).render(
   <React.StrictMode>
     <TranslationProvider>
-      <ApplicationInsightsProvider>
-        <RouterProvider router={router} />
-        <Toaster position="top-center" closeButton={true} style={{ zIndex: 60 }} />
-      </ApplicationInsightsProvider>
+      <RepoUiTranslation>
+        <ApplicationInsightsProvider>
+          <RouterProvider router={router} />
+          <Toaster position="top-center" closeButton={true} style={{ zIndex: 60 }} />
+        </ApplicationInsightsProvider>
+      </RepoUiTranslation>
     </TranslationProvider>
   </React.StrictMode>
 );

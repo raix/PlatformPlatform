@@ -63,19 +63,6 @@ const store: TranslationStore = ((globalThis as Record<string, unknown>).__appTr
   activateInflight: new Map()
 } satisfies TranslationStore) as TranslationStore;
 
-// `@repo/ui` is consumed as a built package (its `exports` map subpaths into `dist`), so a templated
-// dynamic import cannot be resolved into a scannable directory by the bundler. Each locale is imported
-// explicitly; keep this map in sync with `i18n.config.ts`.
-const sharedUiSystemId = "shared-ui";
-const sharedUiCatalogs: Record<Locale, () => Promise<{ messages?: Messages }>> = {
-  "en-US": () => import("@repo/ui/translations/locale/en-US"),
-  "da-DK": () => import("@repo/ui/translations/locale/da-DK")
-};
-const sharedUiLoader: LocalLoaderFunction = async (locale) => {
-  const module = await sharedUiCatalogs[locale]?.();
-  return { messages: module?.messages ?? {} };
-};
-
 export function registerCatalog(systemId: string, loader: LocalLoaderFunction): void {
   if (!store.loaders.has(systemId)) {
     store.loaders.set(systemId, loader);
@@ -214,12 +201,33 @@ export const Translation = {
    * activate the initial locale before the app renders.
    */
   async create(ownLoader: LocalLoaderFunction): Promise<{ TranslationProvider: typeof TranslationProvider }> {
-    registerCatalog(sharedUiSystemId, sharedUiLoader);
     registerCatalog("host", ownLoader);
     await loadAllAndActivate(resolveInitialLocale());
     return { TranslationProvider };
   }
 };
+
+/**
+ * Blocks its subtree until `systemId`'s catalog for the active locale has merged into the shared
+ * dictionary — suspending (via a thrown promise) while it loads. Shared by the federated-module HOC and
+ * the app-level package provider below.
+ */
+function SystemTranslationGate({
+  systemId,
+  loader,
+  children
+}: {
+  systemId: string;
+  loader: LocalLoaderFunction;
+  children: React.ReactNode;
+}) {
+  const { i18n: activeI18n } = useLingui();
+  const locale = activeI18n.locale as Locale;
+  if (!isLoaded(systemId, locale)) {
+    throw ensureSystemActive(systemId, loader, locale);
+  }
+  return <>{children}</>;
+}
 
 /**
  * Wrap a federated module so it contributes its own catalog to the shared dictionary. The system
@@ -229,20 +237,33 @@ export const Translation = {
 export function withSystemTranslations(systemId: string, loader: LocalLoaderFunction) {
   registerCatalog(systemId, loader);
   return function wrap<P extends object>(Component: ComponentType<P>) {
-    function SystemTranslated(props: P) {
-      const { i18n: activeI18n } = useLingui();
-      const locale = activeI18n.locale as Locale;
-      if (!isLoaded(systemId, locale)) {
-        throw ensureSystemActive(systemId, loader, locale);
-      }
-      return <Component {...props} />;
-    }
     return function WithSystemTranslations(props: P) {
       return (
         <Suspense fallback={null}>
-          <SystemTranslated {...props} />
+          <SystemTranslationGate systemId={systemId} loader={loader}>
+            <Component {...props} />
+          </SystemTranslationGate>
         </Suspense>
       );
     };
+  };
+}
+
+/**
+ * Build an app-level provider that contributes a bundled shared-webapp package's own catalog to the
+ * shared dictionary. Unlike a federated module (which decorates each exposed export), a bundled package
+ * is used throughout the app, so the application renders this provider once around its tree. The package
+ * owns its loader; this only registers it and gates rendering until it's merged.
+ */
+export function createSystemTranslationProvider(systemId: string, loader: LocalLoaderFunction) {
+  registerCatalog(systemId, loader);
+  return function SystemTranslationProvider({ children }: { children: React.ReactNode }) {
+    return (
+      <Suspense fallback={null}>
+        <SystemTranslationGate systemId={systemId} loader={loader}>
+          {children}
+        </SystemTranslationGate>
+      </Suspense>
+    );
   };
 }
