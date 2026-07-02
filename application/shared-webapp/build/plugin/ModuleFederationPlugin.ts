@@ -14,7 +14,7 @@ if (!fs.existsSync(applicationPackageJson)) {
   throw new Error(`Cannot find package.json in the application root: ${applicationRoot}`);
 }
 
-const { dependencies } = require(applicationPackageJson);
+const { dependencies } = JSON.parse(fs.readFileSync(applicationPackageJson, "utf-8"));
 
 const SYSTEM_ID = getSystemId();
 

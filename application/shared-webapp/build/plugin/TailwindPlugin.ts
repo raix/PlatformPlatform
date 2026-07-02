@@ -8,7 +8,7 @@ import path from "node:path";
 /**
  * Path to the shared Tailwind CSS styles file.
  */
-const tailwindStyleFilename = path.resolve(__dirname, "..", "..", "..", "ui", "tailwind.css");
+const tailwindStyleFilename = path.resolve(import.meta.dirname, "..", "..", "..", "ui", "tailwind.css");
 
 if (fs.existsSync(tailwindStyleFilename) === false) {
   // This is a critical error, so we exit the process letting the developer know.
