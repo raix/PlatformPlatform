@@ -21,7 +21,7 @@ import { withAccountTranslations } from "@/shared/translations/withAccountTransl
 import { SupportDialog } from "../common/SupportDialog";
 import { SwitchingAccountLoader } from "../common/SwitchingAccountLoader";
 import { logoutApi } from "../common/tenantUtils";
-import { MobileMenuDialogs } from "../sideMenu/MobileMenu";
+import { MobileMenuDialogs } from "../sideMenu/MobileMenuDialogs";
 import { UserMenuDropdownContent } from "./UserMenuDropdownContent";
 import { useSidebarWidth } from "./useSidebarWidth";
 import { useUserMenuTenants } from "./useUserMenuTenants";

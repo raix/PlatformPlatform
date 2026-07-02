@@ -1,8 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { trackInteraction, useTrackOpen } from "@repo/infrastructure/applicationInsights/ApplicationInsightsProvider";
-import { authSyncService, type TenantSwitchedMessage } from "@repo/infrastructure/auth/AuthSyncService";
-import { loggedInPath } from "@repo/infrastructure/auth/constants";
 import { useUserInfo } from "@repo/infrastructure/auth/hooks";
 import { productName } from "@repo/infrastructure/branding";
 import { Button } from "@repo/ui/components/Button";
@@ -22,88 +20,9 @@ import { useContext, useEffect, useState } from "react";
 
 import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
 
-import { SupportDialog } from "../common/SupportDialog";
-import { SwitchingAccountLoader } from "../common/SwitchingAccountLoader";
-import { fetchTenants, switchTenantApi, type TenantInfo } from "../common/tenantUtils";
+import { fetchTenants, type TenantInfo } from "../common/tenantUtils";
 import { MobileMenuContent } from "./MobileMenuContent";
-import { TenantSwitcherDrawer } from "./TenantSwitcherDrawer";
-
-export function MobileMenuDialogs() {
-  const userInfo = useUserInfo();
-  const [isTenantSwitcherOpen, setIsTenantSwitcherOpen] = useState(false);
-  const [isSwitching, setIsSwitching] = useState(false);
-  const [isSupportDialogOpen, setIsSupportDialogOpen] = useState(false);
-  const [tenants, setTenants] = useState<TenantInfo[]>([]);
-
-  const currentTenantId = userInfo?.tenantId;
-
-  useEffect(() => {
-    const handleOpenSupport = () => setIsSupportDialogOpen(true);
-    const handleOpenTenantSwitcher = (event: CustomEvent<{ tenants: TenantInfo[] }>) => {
-      setTenants(event.detail.tenants);
-      setIsTenantSwitcherOpen(true);
-    };
-
-    window.addEventListener("open-support-dialog", handleOpenSupport);
-    window.addEventListener("open-tenant-switcher", handleOpenTenantSwitcher as EventListener);
-    return () => {
-      window.removeEventListener("open-support-dialog", handleOpenSupport);
-      window.removeEventListener("open-tenant-switcher", handleOpenTenantSwitcher as EventListener);
-    };
-  }, []);
-
-  const handleTenantSwitch = async (tenant: TenantInfo) => {
-    if (tenant.tenantId === currentTenantId || tenant.isNew) {
-      return;
-    }
-
-    trackInteraction("Switch account", "interaction");
-    setIsSwitching(true);
-    setIsTenantSwitcherOpen(false);
-
-    try {
-      localStorage.setItem("preferred-tenant", tenant.tenantId);
-      if (tenant.tenantName) {
-        localStorage.setItem(`tenant-name-${tenant.tenantId}`, tenant.tenantName);
-      }
-
-      await switchTenantApi(tenant.tenantId);
-
-      if (userInfo?.tenantId && userInfo?.id) {
-        const message: Omit<TenantSwitchedMessage, "timestamp"> = {
-          type: "TENANT_SWITCHED",
-          newTenantId: tenant.tenantId,
-          previousTenantId: userInfo.tenantId,
-          tenantName: tenant.tenantName || t`Unnamed account`,
-          userId: userInfo.id
-        };
-        authSyncService.broadcast(message);
-      }
-
-      if (window.location.pathname === "/") {
-        window.location.href = loggedInPath;
-      } else {
-        window.location.reload();
-      }
-    } catch {
-      setIsSwitching(false);
-    }
-  };
-
-  return (
-    <>
-      <TenantSwitcherDrawer
-        isOpen={isTenantSwitcherOpen}
-        onOpenChange={setIsTenantSwitcherOpen}
-        tenants={tenants}
-        currentTenantId={currentTenantId}
-        onTenantSwitch={handleTenantSwitch}
-      />
-      {isSwitching && <SwitchingAccountLoader />}
-      <SupportDialog isOpen={isSupportDialogOpen} onOpenChange={setIsSupportDialogOpen} />
-    </>
-  );
-}
+import { MobileMenuDialogs } from "./MobileMenuDialogs";
 
 export interface MobileMenuProps {
   onNavigate?: (path: string) => void;
@@ -223,9 +142,8 @@ function MobileMenu({ onNavigate }: Readonly<MobileMenuProps>) {
           </TooltipContent>
         </Tooltip>
       </div>
-      {/* Mounts the SupportDialog + TenantSwitcherDrawer event listeners. On desktop these are
-          mounted inside UserMenu (in the sidebar header), but the header isn't rendered in the
-          mobile overlay, so we mount them here too. */}
+      {/* Mounts the SupportDialog + TenantSwitcherDrawer event listeners. On desktop these mount
+          inside UserMenu's sidebar header, which the mobile overlay omits, so we mount them here too. */}
       <MobileMenuDialogs />
     </div>
   );
