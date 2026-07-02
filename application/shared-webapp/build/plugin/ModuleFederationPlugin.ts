@@ -48,6 +48,17 @@ export function ModuleFederationPlugin({
                 "react-dom": {
                   singleton: true,
                   requiredVersion: dependencies["react-dom"]
+                },
+                // Lingui's `i18n` is a module-level singleton exported from @lingui/core. It must be a
+                // single instance across every remote so the merged catalog activated by one system is
+                // the same object every other system's `<Trans>`/`useLingui` reads from.
+                "@lingui/core": {
+                  singleton: true,
+                  requiredVersion: dependencies["@lingui/core"]
+                },
+                "@lingui/react": {
+                  singleton: true,
+                  requiredVersion: dependencies["@lingui/react"]
                 }
               }
             }
