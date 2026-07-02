@@ -11,6 +11,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@repo/ui/components/Too
 import { FileQuestion, Home, LogOut } from "lucide-react";
 import { useContext, useState } from "react";
 
+import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
+
 import LocaleSwitcher from "../common/LocaleSwitcher";
 import SupportButton from "../common/SupportButton";
 import ThemeModeSelector from "../common/ThemeModeSelector";
@@ -85,7 +87,7 @@ function NotFoundNavigation() {
   );
 }
 
-export default function NotFoundPage() {
+function NotFoundPage() {
   return (
     <main id="account" style={{ minHeight: "100vh" }} className="flex w-full flex-col bg-background">
       <NotFoundNavigation />
@@ -123,3 +125,5 @@ export default function NotFoundPage() {
     </main>
   );
 }
+
+export default withAccountTranslations(NotFoundPage);

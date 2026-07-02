@@ -15,6 +15,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@repo/ui/components/Too
 import { AlertTriangle, Home, LogOut, RefreshCw } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 
+import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
+
 import LocaleSwitcher from "../common/LocaleSwitcher";
 import SupportButton from "../common/SupportButton";
 import ThemeModeSelector from "../common/ThemeModeSelector";
@@ -91,7 +93,7 @@ function ErrorNavigation() {
   );
 }
 
-export default function ErrorPage(props: Readonly<ErrorComponentProps>) {
+function ErrorPage(props: Readonly<ErrorComponentProps>) {
   // Handle not found errors with dedicated page
   if (isNotFoundError(props.error)) {
     return <NotFoundPage />;
@@ -192,3 +194,5 @@ function GeneralErrorPage({ error }: Readonly<ErrorComponentProps>) {
     </main>
   );
 }
+
+export default withAccountTranslations(ErrorPage);

@@ -10,8 +10,9 @@ import { Suspense } from "react";
 import LocaleSwitcher from "@/federated-modules/common/LocaleSwitcher";
 import ThemeModeSelector from "@/federated-modules/common/ThemeModeSelector";
 import UserMenu from "@/federated-modules/userMenu/UserMenu";
+import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
 
-export default function PublicNavigation() {
+function PublicNavigation() {
   const isAuthenticated = useIsAuthenticated();
 
   return (
@@ -46,3 +47,5 @@ export default function PublicNavigation() {
     </nav>
   );
 }
+
+export default withAccountTranslations(PublicNavigation);

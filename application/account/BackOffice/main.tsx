@@ -2,7 +2,7 @@ import "@repo/ui/theme.css";
 import "@repo/ui/tailwind.css";
 import { ApplicationInsightsProvider } from "@repo/infrastructure/applicationInsights/ApplicationInsightsProvider";
 import { setupGlobalErrorHandlers } from "@repo/infrastructure/http/globalErrorHandlers";
-import { createFederatedTranslation } from "@repo/infrastructure/translations/createFederatedTranslation";
+import { Translation } from "@repo/infrastructure/translations/Translation";
 import { Toaster } from "@repo/ui/components/Sonner";
 import { RouterProvider } from "@tanstack/react-router";
 import React from "react";
@@ -10,7 +10,7 @@ import reactDom from "react-dom/client";
 
 import { router } from "@/shared/lib/router/router";
 
-const { TranslationProvider } = await createFederatedTranslation(
+const { TranslationProvider } = await Translation.create(
   (locale) => import(`@/shared/translations/locale/${locale}.ts`)
 );
 

@@ -9,6 +9,8 @@ import { Logo } from "@repo/ui/components/Logo";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@repo/ui/components/Tooltip";
 import { MailIcon } from "lucide-react";
 
+import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
+
 // Brand icons removed from lucide-react v1 for trademark reasons; inlined here as SVGs.
 function GithubIcon({ className }: { readonly className?: string }) {
   return (
@@ -81,7 +83,7 @@ function SocialLinkButton({ href, ariaLabel, tooltip, children }: SocialLinkButt
   );
 }
 
-export default function PublicFooter() {
+function PublicFooter() {
   const currentYear = new Date().getFullYear();
   const { i18n } = useLingui();
   const tagline = webTaglines[i18n.locale];
@@ -177,3 +179,5 @@ export default function PublicFooter() {
     </footer>
   );
 }
+
+export default withAccountTranslations(PublicFooter);

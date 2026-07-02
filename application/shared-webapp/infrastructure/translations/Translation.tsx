@@ -1,11 +1,12 @@
 import type React from "react";
 
 import { i18n, type Messages } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
-import { useEffect, useMemo, useState } from "react";
+import { I18nProvider, useLingui } from "@lingui/react";
+import { type ComponentType, Suspense, useEffect, useMemo, useState } from "react";
 
+import { preferredLocaleKey } from "./constants";
 import localeMap from "./i18n.config";
-import { type TranslationContext, translationContext } from "./TranslationContext";
+import { type TranslationContext as TranslationContextValue, translationContext } from "./TranslationContext";
 
 export type Locale = keyof typeof localeMap;
 
@@ -26,128 +27,177 @@ export type LocalLoaderFunction = (locale: Locale) => Promise<LocaleFile>;
 
 const TranslationContextProvider = translationContext.Provider;
 
-export class Translation {
-  private readonly _messageCache = new Map<Locale, LocaleFile>();
-  private readonly _defaultLocale = document.documentElement.lang as Locale;
+export const locales = Object.keys(localeMap) as Locale[];
 
-  /**
-   * Prefer using `TranslationConfig.create` instead of this constructor
-   */
-  private readonly localeLoader: LocalLoaderFunction;
+export function getLocaleInfo(locale: Locale): LocaleInfo {
+  return localeMap[locale];
+}
 
-  constructor(localeLoader: LocalLoaderFunction) {
-    this.localeLoader = localeLoader;
-  }
+export function isLocale(value: string): value is Locale {
+  return value in localeMap;
+}
 
-  private readonly _locales: Locale[] = Object.keys(localeMap) as Locale[];
+/**
+ * The single point of coordination for translations across all self-contained systems.
+ *
+ * Only the global Lingui `i18n` object (shared as a module-federation singleton) and `globalThis`
+ * are guaranteed to be single instances across remotes -- `@repo/*` packages are compiled per-remote,
+ * so a module-level store would be duplicated. Every system registers a loader for its own catalog and
+ * all catalogs merge into the one shared `i18n` dictionary.
+ */
+type TranslationStore = {
+  activeLocale: Locale | null;
+  loaders: Map<string, LocalLoaderFunction>;
+  merged: Map<Locale, Messages>;
+  systemLoaded: Map<string, Set<Locale>>;
+  loadInflight: Map<string, Promise<void>>;
+  activateInflight: Map<string, Promise<void>>;
+};
 
-  /**
-   * Get the list of available locales
-   */
-  public get locales(): Locale[] {
-    return this._locales;
-  }
+const store: TranslationStore = ((globalThis as Record<string, unknown>).__appTranslation ??= {
+  activeLocale: null,
+  loaders: new Map(),
+  merged: new Map(),
+  systemLoaded: new Map(),
+  loadInflight: new Map(),
+  activateInflight: new Map()
+} satisfies TranslationStore) as TranslationStore;
 
-  /**
-   * Create a new TranslationConfig instance and load the initial locale
-   */
-  public static async create(localeLoader: LocalLoaderFunction): Promise<Translation> {
-    const config = new Translation(localeLoader);
-    await config.dynamicActivate();
-    return config;
-  }
+// `@repo/ui` is consumed as a built package (its `exports` map subpaths into `dist`), so a templated
+// dynamic import cannot be resolved into a scannable directory by the bundler. Each locale is imported
+// explicitly; keep this map in sync with `i18n.config.ts`.
+const sharedUiSystemId = "shared-ui";
+const sharedUiCatalogs: Record<Locale, () => Promise<{ messages?: Messages }>> = {
+  "en-US": () => import("@repo/ui/translations/locale/en-US"),
+  "da-DK": () => import("@repo/ui/translations/locale/da-DK")
+};
+const sharedUiLoader: LocalLoaderFunction = async (locale) => {
+  const module = await sharedUiCatalogs[locale]?.();
+  return { messages: module?.messages ?? {} };
+};
 
-  /**
-   * Load and activate the given locale
-   */
-  public async dynamicActivate(newLocale?: string | undefined) {
-    const locale = this.getLocale(newLocale);
-    const { messages } = await this.loadCatalog(locale);
-    i18n.loadAndActivate({ locale: locale as string, messages });
-  }
-
-  /**
-   * Get the locale info for the given locale
-   */
-  public getLocaleInfo(locale: Locale): LocaleInfo {
-    return localeMap[locale];
-  }
-
-  /**
-   * This component should be used as a wrapper around the application to provide
-   * the translation context to the rest of the application
-   *
-   * @param children The children to render
-   */
-  public TranslationProvider = ({ children }: { children: React.ReactNode }) => {
-    return <TranslationProvider translation={this}>{children}</TranslationProvider>;
-  };
-
-  /**
-   * Get the locale for the application
-   */
-  private getLocale(locale?: string): Locale {
-    if (locale && this.isLocale(locale)) {
-      return locale;
-    }
-    if (import.meta.env.LOCALE && this.isLocale(import.meta.env.LOCALE)) {
-      return import.meta.env.LOCALE;
-    }
-    return this._defaultLocale;
-  }
-
-  /**
-   * Load the catalog for the given locale
-   */
-  private async loadCatalog(locale: Locale): Promise<LocaleFile> {
-    const existingLocaleFile = this._messageCache.get(locale);
-    if (existingLocaleFile) {
-      return existingLocaleFile;
-    }
-
-    const messageFile = await this.localeLoader(locale);
-    this._messageCache.set(locale, messageFile);
-
-    return messageFile;
-  }
-
-  /**
-   * Assert that the given string is a valid locale
-   */
-  private isLocale(locale: string): locale is Locale {
-    return locale in localeMap;
+export function registerCatalog(systemId: string, loader: LocalLoaderFunction): void {
+  if (!store.loaders.has(systemId)) {
+    store.loaders.set(systemId, loader);
   }
 }
 
-type TranslationProviderProps = {
-  translation: Translation;
-  children: React.ReactNode;
-};
+function markLoaded(systemId: string, locale: Locale): void {
+  let set = store.systemLoaded.get(systemId);
+  if (!set) {
+    set = new Set();
+    store.systemLoaded.set(systemId, set);
+  }
+  set.add(locale);
+}
 
-function TranslationProvider({ children, translation }: Readonly<TranslationProviderProps>) {
-  const [currentLocale, setCurrentLocale] = useState(i18n.locale as Locale);
+function isLoaded(systemId: string, locale: Locale): boolean {
+  return store.systemLoaded.get(systemId)?.has(locale) ?? false;
+}
 
-  const value: TranslationContext = useMemo(
-    () => ({
-      currentLocale,
-      setLocale: async (locale: string) => {
-        await translation.dynamicActivate(locale);
-        setCurrentLocale(locale as Locale); // Update state to force re-render
-      },
-      locales: translation.locales,
-      getLocaleInfo: translation.getLocaleInfo
-    }),
-    [translation, currentLocale]
-  );
+/** Load a system's catalog for a locale into the merged dictionary (no activation). Idempotent. */
+function loadSystemLocale(systemId: string, loader: LocalLoaderFunction, locale: Locale): Promise<void> {
+  if (isLoaded(systemId, locale)) {
+    return Promise.resolve();
+  }
+  const key = `${systemId}:${locale}`;
+  const existing = store.loadInflight.get(key);
+  if (existing) {
+    return existing;
+  }
+  const promise = loader(locale)
+    .then(({ messages }) => {
+      // Later merges win; the shared-ui loader is registered first so it stays lowest precedence, the host
+      // next, and federated remotes register on mount so they layer on top -- matching the previous
+      // "shared < own < remote" precedence.
+      store.merged.set(locale, { ...store.merged.get(locale), ...messages });
+    })
+    .catch((error) => {
+      // A single system's catalog failing to load must not reject: that would crash the Suspense boundary
+      // in `SystemTranslationGate`, or abort a locale switch (`loadAllAndActivate`) for every other system.
+      // Degrade to untranslated for just this system instead.
+      console.error(`Failed to load translations for "${systemId}" (${locale})`, error);
+    })
+    .finally(() => {
+      // Mark loaded on success and on failure alike, so a persistent load error degrades gracefully to
+      // untranslated rather than re-suspending forever.
+      markLoaded(systemId, locale);
+    });
+  store.loadInflight.set(key, promise);
+  return promise;
+}
+
+/** Load every registered system's catalog for the locale, then activate the merged dictionary once. */
+async function loadAllAndActivate(locale: Locale): Promise<void> {
+  await Promise.all([...store.loaders].map(([systemId, loader]) => loadSystemLocale(systemId, loader, locale)));
+  store.activeLocale = locale;
+  i18n.loadAndActivate({ locale, messages: store.merged.get(locale) ?? {} });
+}
+
+/** Merge a single system's catalog into the currently active locale (used when it mounts late). */
+function ensureSystemActive(systemId: string, loader: LocalLoaderFunction, locale: Locale): Promise<void> {
+  const key = `${systemId}:${locale}`;
+  const existing = store.activateInflight.get(key);
+  if (existing) {
+    return existing;
+  }
+  const promise = loadSystemLocale(systemId, loader, locale).then(() => {
+    if (store.activeLocale === locale) {
+      i18n.loadAndActivate({ locale, messages: store.merged.get(locale) ?? {} });
+    }
+  });
+  store.activateInflight.set(key, promise);
+  return promise;
+}
+
+/**
+ * Resolve the initial locale. Authenticated users follow the server (`<html lang>`, set from the JWT);
+ * anonymous users have their stored choice re-applied by `useInitializeLocale` after mount.
+ */
+function resolveInitialLocale(): Locale {
+  const serverLocale = document.documentElement.lang;
+  if (isLocale(serverLocale)) {
+    return serverLocale;
+  }
+  if (import.meta.env.LOCALE && isLocale(import.meta.env.LOCALE)) {
+    return import.meta.env.LOCALE;
+  }
+  return locales[0];
+}
+
+/** Change the active locale for every registered system and persist the choice. */
+export function setLocale(locale: string): Promise<void> {
+  if (!isLocale(locale)) {
+    return Promise.resolve();
+  }
+  localStorage.setItem(preferredLocaleKey, locale);
+  document.documentElement.lang = locale;
+  return loadAllAndActivate(locale);
+}
+
+function TranslationProvider({ children }: { children: React.ReactNode }) {
+  // Re-key the provider on locale change so the whole subtree remounts. Plain `t` macro strings read the
+  // global i18n but don't subscribe to context updates, so without a remount their labels stay stale
+  // after a locale switch while `<Trans>`/`useLingui` consumers update.
+  const [currentLocale, setCurrentLocale] = useState(() => i18n.locale as Locale);
 
   useEffect(() => {
-    const handleLocaleChangeRequest = async (event: Event) => {
-      const locale = (event as CustomEvent).detail.locale;
-      await value.setLocale(locale);
+    const unsubscribe = i18n.on("change", () => setCurrentLocale(i18n.locale as Locale));
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const handleLocaleChangeRequest = (event: Event) => {
+      void setLocale((event as CustomEvent).detail.locale);
     };
     document.addEventListener("locale-change-request", handleLocaleChangeRequest);
     return () => document.removeEventListener("locale-change-request", handleLocaleChangeRequest);
-  }, [value]);
+  }, []);
+
+  const value: TranslationContextValue = useMemo(
+    () => ({ currentLocale, setLocale, locales, getLocaleInfo }),
+    [currentLocale]
+  );
 
   return (
     <TranslationContextProvider value={value}>
@@ -156,4 +206,43 @@ function TranslationProvider({ children, translation }: Readonly<TranslationProv
       </I18nProvider>
     </TranslationContextProvider>
   );
+}
+
+export const Translation = {
+  /**
+   * Bootstrap translations for a host SPA: register the shared-UI and host catalogs, then load and
+   * activate the initial locale before the app renders.
+   */
+  async create(ownLoader: LocalLoaderFunction): Promise<{ TranslationProvider: typeof TranslationProvider }> {
+    registerCatalog(sharedUiSystemId, sharedUiLoader);
+    registerCatalog("host", ownLoader);
+    await loadAllAndActivate(resolveInitialLocale());
+    return { TranslationProvider };
+  }
+};
+
+/**
+ * Wrap a federated module so it contributes its own catalog to the shared dictionary. The system
+ * self-registers (no host needs to know it exists) and suspends until its catalog for the active locale
+ * is merged, preventing a flash of untranslated content inside the federated subtree.
+ */
+export function withSystemTranslations(systemId: string, loader: LocalLoaderFunction) {
+  registerCatalog(systemId, loader);
+  return function wrap<P extends object>(Component: ComponentType<P>) {
+    function SystemTranslated(props: P) {
+      const { i18n: activeI18n } = useLingui();
+      const locale = activeI18n.locale as Locale;
+      if (!isLoaded(systemId, locale)) {
+        throw ensureSystemActive(systemId, loader, locale);
+      }
+      return <Component {...props} />;
+    }
+    return function WithSystemTranslations(props: P) {
+      return (
+        <Suspense fallback={null}>
+          <SystemTranslated {...props} />
+        </Suspense>
+      );
+    };
+  };
 }

@@ -20,6 +20,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@repo/ui/components/Too
 import { LayoutDashboardIcon, MessageCircleQuestion } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 
+import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
+
 import { SupportDialog } from "../common/SupportDialog";
 import { SwitchingAccountLoader } from "../common/SwitchingAccountLoader";
 import { fetchTenants, switchTenantApi, type TenantInfo } from "../common/tenantUtils";
@@ -110,7 +112,7 @@ export interface MobileMenuProps {
 // Rich mobile navigation surface rendered inside the Sidebar's mobile Sheet. Shows tenant info,
 // user actions, tenant switcher, navigation links, and a support button. Federated so both the
 // Main and Account apps can reuse it inside their mobile sidebars.
-export default function MobileMenu({ onNavigate }: Readonly<MobileMenuProps>) {
+function MobileMenu({ onNavigate }: Readonly<MobileMenuProps>) {
   const userInfo = useUserInfo();
   const overlayCtx = useContext(overlayContext);
   const [tenants, setTenants] = useState<TenantInfo[]>([]);
@@ -228,3 +230,5 @@ export default function MobileMenu({ onNavigate }: Readonly<MobileMenuProps>) {
     </div>
   );
 }
+
+export default withAccountTranslations(MobileMenu);

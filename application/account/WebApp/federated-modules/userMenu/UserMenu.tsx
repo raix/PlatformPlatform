@@ -16,6 +16,7 @@ import { ChevronsUpDownIcon } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 
 import { MainNavigationContext } from "@/shared/hooks/useMainNavigation";
+import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
 
 import { SupportDialog } from "../common/SupportDialog";
 import { SwitchingAccountLoader } from "../common/SwitchingAccountLoader";
@@ -29,7 +30,7 @@ interface UserMenuProps {
   isCollapsed?: boolean;
 }
 
-export default function UserMenu({ isCollapsed: isCollapsedProp }: Readonly<UserMenuProps>) {
+function UserMenu({ isCollapsed: isCollapsedProp }: Readonly<UserMenuProps>) {
   const userInfo = useUserInfo();
   const isCollapsedContext = useContext(collapsedContext);
   const isCollapsed = isCollapsedProp ?? isCollapsedContext;
@@ -169,3 +170,5 @@ export default function UserMenu({ isCollapsed: isCollapsedProp }: Readonly<User
     </div>
   );
 }
+
+export default withAccountTranslations(UserMenu);

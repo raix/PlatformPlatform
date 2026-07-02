@@ -3,6 +3,8 @@ import { Trans } from "@lingui/react/macro";
 import { Button } from "@repo/ui/components/Button";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@repo/ui/components/Dialog";
 
+import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
+
 export type AuthSyncModalType = "tenant-switch" | "logged-in" | "logged-out";
 
 export interface AuthSyncModalProps {
@@ -12,7 +14,7 @@ export interface AuthSyncModalProps {
   onPrimaryAction: () => void;
 }
 
-export default function AuthSyncModal({ isOpen, type, newTenantName, onPrimaryAction }: AuthSyncModalProps) {
+function AuthSyncModal({ isOpen, type, newTenantName, onPrimaryAction }: AuthSyncModalProps) {
   const getModalContent = () => {
     switch (type) {
       case "tenant-switch":
@@ -97,3 +99,5 @@ export default function AuthSyncModal({ isOpen, type, newTenantName, onPrimaryAc
     </Dialog>
   );
 }
+
+export default withAccountTranslations(AuthSyncModal);
