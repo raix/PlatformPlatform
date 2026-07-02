@@ -3,44 +3,29 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "source": "./index.ts",
-  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "source": "./index.ts",
-      "default": "./dist/index.js"
-    },
-    "./components/*": {
-      "types": "./dist/components/*.d.ts",
-      "source": "./components/*",
-      "default": "./dist/components/*"
-    },
-    "./forms/*": {
-      "types": "./dist/forms/*.d.ts",
-      "source": "./forms/*",
-      "default": "./dist/forms/*"
-    },
-    "./theme/*": {
-      "types": "./dist/theme/*.d.ts",
-      "source": "./theme/*",
-      "default": "./dist/theme/*"
-    },
+    "./*.css": "./dist/*.css",
+    "./*.svg": "./dist/*.svg",
+    "./*.webp": "./dist/*.webp",
+    "./*.png": "./dist/*.png",
     "./*": {
       "types": "./dist/*.d.ts",
-      "source": "./*",
-      "default": "./dist/*"
+      "import": "./dist/*.js",
+      "require": "./dist/*.js"
     },
     "./theme.css": "./theme.css",
     "./tailwind.css": "./tailwind.css",
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "rimraf ./dist && npm run copyImages && tsc -p .",
+    "build": "rslib build",
     "check": "oxfmt --check && oxlint",
-    "copyImages": "node ./copyImages.js",
-    "dev": "tsc -p . -w",
-    "dev:setup": "rimraf ./dist && npm run copyImages && tsc -p .",
+    "dev": "rslib build --watch --no-clean",
+    "dev:setup": "rslib build",
     "format": "oxfmt && (oxlint --fix || true)",
     "lint": "oxlint --deny-warnings",
     "update-translations": "lingui extract --clean && lingui compile --typescript"

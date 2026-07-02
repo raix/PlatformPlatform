@@ -8,7 +8,6 @@ import { RunTimeEnvironmentPlugin } from "@repo/build/plugin/RunTimeEnvironmentP
 import { TailwindPlugin } from "@repo/build/plugin/TailwindPlugin";
 import { defineConfig } from "@rsbuild/core";
 import { pluginReact } from "@rsbuild/plugin-react";
-import { pluginSourceBuild } from "@rsbuild/plugin-source-build";
 import { pluginSvgr } from "@rsbuild/plugin-svgr";
 import { pluginTypeCheck } from "@rsbuild/plugin-type-check";
 
@@ -40,9 +39,6 @@ export default defineConfig({
     pluginReact(),
     pluginTypeCheck(),
     pluginSvgr(),
-    pluginSourceBuild({
-      sourceField: "source"
-    }),
     FileSystemRouterPlugin(),
     RunTimeEnvironmentPlugin(customBuildEnv),
     LinguiPlugin(),

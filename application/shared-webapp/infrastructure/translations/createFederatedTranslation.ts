@@ -74,10 +74,19 @@ async function loadRemoteTranslations(remoteName: string, locale: Locale): Promi
 /**
  * Load translations from `@repo/ui` (the shared component library catalog).
  * These are merged underneath the host SPA's own messages so the host can override.
+ *
+ * `@repo/ui` is consumed as a built package (its `exports` map subpaths into `dist`), so a
+ * templated dynamic import cannot be resolved into a scannable directory by the bundler. Each
+ * locale is therefore imported explicitly; keep this map in sync with `i18n.config.ts`.
  */
+const sharedCatalogLoaders: Record<Locale, () => Promise<{ messages?: Messages }>> = {
+  "en-US": () => import("@repo/ui/translations/locale/en-US"),
+  "da-DK": () => import("@repo/ui/translations/locale/da-DK")
+};
+
 async function loadSharedTranslations(locale: Locale): Promise<Messages | null> {
   try {
-    const module = await import(`@repo/ui/translations/locale/${locale}.ts`);
+    const module = await sharedCatalogLoaders[locale]?.();
     return module?.messages ?? null;
   } catch {
     return null;
