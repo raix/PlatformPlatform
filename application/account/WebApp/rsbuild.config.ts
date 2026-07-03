@@ -47,7 +47,7 @@ export default defineConfig({
     FileSystemRouterPlugin(),
     RunTimeEnvironmentPlugin(customBuildEnv, { federationOnly: true }),
     LinguiPlugin(),
-    DevelopmentServerPlugin({ port: accountStaticPort, liveReload: false }),
+    DevelopmentServerPlugin({ port: accountStaticPort, liveReload: false, hmrPath: "/account/rsbuild-hmr" }),
     ModuleFederationPlugin({
       exposes: {
         "./AccessDeniedPage": "./federated-modules/errorPages/AccessDeniedPage.tsx",
