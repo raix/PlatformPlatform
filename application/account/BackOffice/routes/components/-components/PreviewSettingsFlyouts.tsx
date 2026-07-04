@@ -1,7 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react";
 import { Trans } from "@lingui/react/macro";
-import { preferredLocaleKey } from "@repo/infrastructure/translations/constants";
 import { type Locale, translationContext } from "@repo/infrastructure/translations/TranslationContext";
 import { Button } from "@repo/ui/components/Button";
 import { Popover, PopoverContent, PopoverTrigger } from "@repo/ui/components/Popover";
@@ -80,9 +79,7 @@ export function PreviewLanguageFlyout() {
   const currentLocale = i18n.locale as Locale;
   const handleLocaleChange = (locale: Locale) => {
     if (locale !== currentLocale) {
-      setLocale(locale).then(() => {
-        localStorage.setItem(preferredLocaleKey, locale);
-      });
+      setLocale(locale);
     }
   };
   return (

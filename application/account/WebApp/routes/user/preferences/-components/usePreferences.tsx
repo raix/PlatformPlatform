@@ -76,12 +76,10 @@ export function usePreferences() {
 
     const localeLabel = locales.find((l) => l.id === locale)?.label ?? locale;
     trackInteraction("User preferences", "interaction", `Change language to "${localeLabel}"`);
-    localStorage.setItem(preferredLocaleKey, locale);
     changeLocaleMutation.mutate(
       { body: { locale } },
       {
         onSuccess: async () => {
-          document.documentElement.lang = locale;
           await setLocale(locale);
           setCurrentLocale(locale);
         }

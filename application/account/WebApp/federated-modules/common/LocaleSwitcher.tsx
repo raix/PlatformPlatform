@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useIsAuthenticated } from "@repo/infrastructure/auth/hooks";
 import { enhancedFetch } from "@repo/infrastructure/http/httpClient";
+import { preferredLocaleKey } from "@repo/infrastructure/translations/constants";
 import localeMap from "@repo/infrastructure/translations/i18n.config";
 import { type Locale, translationContext } from "@repo/infrastructure/translations/TranslationContext";
 import { Button } from "@repo/ui/components/Button";
@@ -14,8 +15,6 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@repo/ui/components/Tooltip";
 import { CheckIcon, GlobeIcon } from "lucide-react";
 import { use, useEffect, useState } from "react";
-
-const PREFERRED_LOCALE_KEY = "preferred-locale";
 
 const locales = Object.entries(localeMap).map(([id, info]) => ({
   id: id as Locale,
@@ -50,7 +49,7 @@ export default function LocaleSwitcher({
   useEffect(() => {
     // Get current locale from document or localStorage
     const htmlLang = document.documentElement.lang as Locale;
-    const savedLocale = localStorage.getItem(PREFERRED_LOCALE_KEY) as Locale;
+    const savedLocale = localStorage.getItem(preferredLocaleKey) as Locale;
 
     if (savedLocale && locales.some((l) => l.id === savedLocale)) {
       setCurrentLocale(savedLocale);
@@ -64,15 +63,11 @@ export default function LocaleSwitcher({
       // Call onAction if provided (for closing mobile menu)
       onAction?.();
 
-      // Save to localStorage
-      localStorage.setItem(PREFERRED_LOCALE_KEY, locale);
-
       // Only update backend if user is authenticated
       if (isAuthenticated) {
         await updateLocaleOnBackend(locale);
       }
 
-      document.documentElement.lang = locale;
       await setLocale(locale);
       setCurrentLocale(locale);
     }

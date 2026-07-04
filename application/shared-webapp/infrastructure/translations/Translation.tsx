@@ -152,12 +152,17 @@ function resolveInitialLocale(): Locale {
   return locales[0];
 }
 
+/** Persist the preferred-locale choice. */
+export function persistPreferredLocale(locale: Locale): void {
+  localStorage.setItem(preferredLocaleKey, locale);
+}
+
 /** Change the active locale for every registered system and persist the choice. */
 export function setLocale(locale: string): Promise<void> {
   if (!isLocale(locale)) {
     return Promise.resolve();
   }
-  localStorage.setItem(preferredLocaleKey, locale);
+  persistPreferredLocale(locale);
   document.documentElement.lang = locale;
   return loadAllAndActivate(locale);
 }

@@ -10,7 +10,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@repo/ui/components/Too
 import { CheckIcon, GlobeIcon } from "lucide-react";
 import { use, useMemo } from "react";
 
-import { preferredLocaleKey } from "./constants";
 import { type Locale, translationContext } from "./TranslationContext";
 
 export function LocaleSwitcher({ "aria-label": ariaLabel }: Readonly<{ "aria-label": string }>) {
@@ -28,9 +27,7 @@ export function LocaleSwitcher({ "aria-label": ariaLabel }: Readonly<{ "aria-lab
 
   const handleLocaleChange = (locale: Locale) => {
     if (locale !== currentLocale) {
-      setLocale(locale).then(() => {
-        localStorage.setItem(preferredLocaleKey, locale);
-      });
+      setLocale(locale);
     }
   };
 

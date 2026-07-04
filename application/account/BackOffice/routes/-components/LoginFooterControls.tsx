@@ -1,7 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react";
 import { Trans } from "@lingui/react/macro";
-import { preferredLocaleKey } from "@repo/infrastructure/translations/constants";
 import localeMap from "@repo/infrastructure/translations/i18n.config";
 import { type Locale, translationContext } from "@repo/infrastructure/translations/TranslationContext";
 import { Button } from "@repo/ui/components/Button";
@@ -83,9 +82,7 @@ function LocaleDropdown() {
 
   const handleLocaleChange = (locale: Locale) => {
     if (locale !== currentLocale) {
-      setLocale(locale).then(() => {
-        localStorage.setItem(preferredLocaleKey, locale);
-      });
+      setLocale(locale);
     }
   };
 
