@@ -4,6 +4,7 @@ import { i18n, type Messages } from "@lingui/core";
 import { I18nProvider, useLingui } from "@lingui/react";
 import { type ComponentType, Suspense, useEffect, useMemo, useState } from "react";
 
+import { ensureSystemActive, hasFailed, isLoaded, loadAllAndActivate, registerCatalog } from "./catalogStore";
 import { persistPreferredLocale, preferredLocaleKey } from "./constants";
 import localeMap from "./i18n.config";
 import { type TranslationContext as TranslationContextValue, translationContext } from "./TranslationContext";
@@ -38,106 +39,6 @@ export function isLocale(value: string): value is Locale {
 }
 
 /**
- * The single point of coordination for translations across all self-contained systems.
- *
- * Only the global Lingui `i18n` object (shared as a module-federation singleton) and `globalThis`
- * are guaranteed to be single instances across remotes -- `@repo/*` packages are compiled per-remote,
- * so a module-level store would be duplicated. Every system registers a loader for its own catalog and
- * all catalogs merge into the one shared `i18n` dictionary.
- */
-type TranslationStore = {
-  activeLocale: Locale | null;
-  loaders: Map<string, LocalLoaderFunction>;
-  merged: Map<Locale, Messages>;
-  systemLoaded: Map<string, Set<Locale>>;
-  loadInflight: Map<string, Promise<void>>;
-  activateInflight: Map<string, Promise<void>>;
-};
-
-const store: TranslationStore = ((globalThis as Record<string, unknown>).__appTranslation ??= {
-  activeLocale: null,
-  loaders: new Map(),
-  merged: new Map(),
-  systemLoaded: new Map(),
-  loadInflight: new Map(),
-  activateInflight: new Map()
-} satisfies TranslationStore) as TranslationStore;
-
-export function registerCatalog(systemId: string, loader: LocalLoaderFunction): void {
-  if (!store.loaders.has(systemId)) {
-    store.loaders.set(systemId, loader);
-  }
-}
-
-function markLoaded(systemId: string, locale: Locale): void {
-  let set = store.systemLoaded.get(systemId);
-  if (!set) {
-    set = new Set();
-    store.systemLoaded.set(systemId, set);
-  }
-  set.add(locale);
-}
-
-function isLoaded(systemId: string, locale: Locale): boolean {
-  return store.systemLoaded.get(systemId)?.has(locale) ?? false;
-}
-
-/** Load a system's catalog for a locale into the merged dictionary (no activation). Idempotent. */
-function loadSystemLocale(systemId: string, loader: LocalLoaderFunction, locale: Locale): Promise<void> {
-  if (isLoaded(systemId, locale)) {
-    return Promise.resolve();
-  }
-  const key = `${systemId}:${locale}`;
-  const existing = store.loadInflight.get(key);
-  if (existing) {
-    return existing;
-  }
-  const promise = loader(locale)
-    .then(({ messages }) => {
-      // Later merges win; the shared-ui loader is registered first so it stays lowest precedence, the host
-      // next, and federated remotes register on mount so they layer on top -- matching the previous
-      // "shared < own < remote" precedence.
-      store.merged.set(locale, { ...store.merged.get(locale), ...messages });
-    })
-    .catch((error) => {
-      // A single system's catalog failing to load must not reject: that would crash the Suspense boundary
-      // in `SystemTranslationGate`, or abort a locale switch (`loadAllAndActivate`) for every other system.
-      // Degrade to untranslated for just this system instead.
-      console.error(`Failed to load translations for "${systemId}" (${locale})`, error);
-    })
-    .finally(() => {
-      // Mark loaded on success and on failure alike, so a persistent load error degrades gracefully to
-      // untranslated rather than re-suspending forever.
-      markLoaded(systemId, locale);
-    });
-  store.loadInflight.set(key, promise);
-  return promise;
-}
-
-/** Load every registered system's catalog for the locale, then activate the merged dictionary once. */
-async function loadAllAndActivate(locale: Locale): Promise<void> {
-  await Promise.all([...store.loaders].map(([systemId, loader]) => loadSystemLocale(systemId, loader, locale)));
-  store.activeLocale = locale;
-  i18n.loadAndActivate({ locale, messages: store.merged.get(locale) ?? {} });
-}
-
-/** Merge a single system's catalog into the currently active locale (used when it mounts late). */
-function ensureSystemActive(systemId: string, loader: LocalLoaderFunction, locale: Locale): Promise<void> {
-  const key = `${systemId}:${locale}`;
-  const existing = store.activateInflight.get(key);
-  if (existing) {
-    return existing;
-  }
-  const promise = loadSystemLocale(systemId, loader, locale).then(() => {
-    if (store.activeLocale === locale) {
-      i18n.loadAndActivate({ locale, messages: store.merged.get(locale) ?? {} });
-    }
-  });
-  store.activateInflight.set(key, promise);
-  return promise;
-}
-
-/**
  * Resolve the initial locale before the first render. Authenticated users follow the server-rendered
  * `<html lang>` (set from their JWT/DB locale) -- it is authoritative. Anonymous users, whose stored
  * preference the server cannot know, have that choice applied here so the first paint is already in the
@@ -167,7 +68,6 @@ export function setLocale(locale: string): Promise<void> {
     return Promise.resolve();
   }
   persistPreferredLocale(locale);
-  document.documentElement.lang = locale;
   return loadAllAndActivate(locale);
 }
 
@@ -232,7 +132,7 @@ function SystemTranslationGate({
 }) {
   const { i18n: activeI18n } = useLingui();
   const locale = activeI18n.locale as Locale;
-  if (!isLoaded(systemId, locale)) {
+  if (!isLoaded(systemId, locale) && !hasFailed(systemId, locale)) {
     throw ensureSystemActive(systemId, loader, locale);
   }
   return <>{children}</>;
