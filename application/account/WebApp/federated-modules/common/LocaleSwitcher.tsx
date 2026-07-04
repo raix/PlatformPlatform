@@ -1,8 +1,8 @@
 import { t } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react";
 import { Trans } from "@lingui/react/macro";
 import { useIsAuthenticated } from "@repo/infrastructure/auth/hooks";
 import { enhancedFetch } from "@repo/infrastructure/http/httpClient";
-import { preferredLocaleKey } from "@repo/infrastructure/translations/constants";
 import localeMap from "@repo/infrastructure/translations/i18n.config";
 import { type Locale, translationContext } from "@repo/infrastructure/translations/TranslationContext";
 import { Button } from "@repo/ui/components/Button";
@@ -14,7 +14,7 @@ import {
 } from "@repo/ui/components/DropdownMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@repo/ui/components/Tooltip";
 import { CheckIcon, GlobeIcon } from "lucide-react";
-import { use, useEffect, useState } from "react";
+import { use } from "react";
 
 const locales = Object.entries(localeMap).map(([id, info]) => ({
   id: id as Locale,
@@ -42,21 +42,11 @@ export default function LocaleSwitcher({
   variant?: "icon" | "mobile-menu";
   onAction?: () => void;
 } = {}) {
-  const [currentLocale, setCurrentLocale] = useState<Locale>("en-US");
+  // Derive the active locale from the shared i18n singleton so the checkmark stays correct no matter which
+  // path changed the locale (this switcher, the preferences screen, an auth refresh); no local mirror.
+  const currentLocale = useLingui().i18n.locale as Locale;
   const isAuthenticated = useIsAuthenticated();
   const { setLocale } = use(translationContext);
-
-  useEffect(() => {
-    // Get current locale from document or localStorage
-    const htmlLang = document.documentElement.lang as Locale;
-    const savedLocale = localStorage.getItem(preferredLocaleKey) as Locale;
-
-    if (savedLocale && locales.some((l) => l.id === savedLocale)) {
-      setCurrentLocale(savedLocale);
-    } else if (htmlLang && locales.some((l) => l.id === htmlLang)) {
-      setCurrentLocale(htmlLang);
-    }
-  }, []);
 
   const handleLocaleChange = async (locale: Locale) => {
     if (locale !== currentLocale) {
@@ -69,7 +59,6 @@ export default function LocaleSwitcher({
       }
 
       await setLocale(locale);
-      setCurrentLocale(locale);
     }
   };
 
