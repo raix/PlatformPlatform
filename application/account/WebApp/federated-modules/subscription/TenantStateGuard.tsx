@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
 import { api, TenantState } from "@/shared/lib/api/client";
-import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
 
 import SuspendedPage from "./SuspendedPage";
 
@@ -22,4 +21,7 @@ function TenantStateGuard({ children, pathname }: Readonly<TenantStateGuardProps
   return children;
 }
 
-export default withAccountTranslations(TenantStateGuard);
+// Not wrapped in withAccountTranslations: this guard has no translatable strings of its own and renders
+// the HOST's children (main's <Outlet/>). Wrapping it would gate host content behind the account remote's
+// catalog load. The one account UI it can render, <SuspendedPage>, self-wraps its own translations.
+export default TenantStateGuard;
