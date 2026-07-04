@@ -152,9 +152,17 @@ function resolveInitialLocale(): Locale {
   return locales[0];
 }
 
-/** Persist the preferred-locale choice. */
+/** The default locale (first in the config). Selecting it clears any stored preference, so an absent
+ * `preferred-locale` entry always means "use the default" -- storage never holds a redundant default. */
+export const defaultLocale = locales[0];
+
+/** Persist the preferred-locale choice, clearing it when it matches the default so absence == default. */
 export function persistPreferredLocale(locale: Locale): void {
-  localStorage.setItem(preferredLocaleKey, locale);
+  if (locale === defaultLocale) {
+    localStorage.removeItem(preferredLocaleKey);
+  } else {
+    localStorage.setItem(preferredLocaleKey, locale);
+  }
 }
 
 /** Change the active locale for every registered system and persist the choice. */
