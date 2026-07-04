@@ -94,8 +94,7 @@ test.describe("@comprehensive", () => {
 
       // Verify interface updates to English
       await expect(page.getByRole("heading", { name: "Hi! Welcome back" })).toBeVisible();
-      // en-US is the default locale, so the preference is cleared rather than stored
-      await expect(page.evaluate(() => localStorage.getItem("preferred-locale"))).resolves.toBeNull();
+      await expect(page.evaluate(() => localStorage.getItem("preferred-locale"))).resolves.toBe("en-US");
     })();
 
     await step("Login with English interface & verify language resets to saved preference")(async () => {
@@ -125,8 +124,7 @@ test.describe("@comprehensive", () => {
       // collisions on the substring "Preferences".
       await expect(page.getByRole("heading", { name: "User preferences", exact: true })).toBeVisible();
 
-      // en-US is the default locale, so the preference is cleared rather than stored
-      await expect(page.evaluate(() => localStorage.getItem("preferred-locale"))).resolves.toBeNull();
+      await expect(page.evaluate(() => localStorage.getItem("preferred-locale"))).resolves.toBe("en-US");
     })();
   });
 
@@ -182,8 +180,7 @@ test.describe("@comprehensive", () => {
         await completeSignupFlow(page2, expect, user2, testContext2, true);
 
         await expect(page2.getByRole("heading", { level: 1 })).toBeVisible();
-        // en-US is the default locale, so no preference is stored
-        await expect(page2.evaluate(() => localStorage.getItem("preferred-locale"))).resolves.toBeNull();
+        await expect(page2.evaluate(() => localStorage.getItem("preferred-locale"))).resolves.toBe("en-US");
       }
     )();
 
@@ -217,10 +214,10 @@ test.describe("@comprehensive", () => {
 
       await typeOneTimeCode(newPage2, getVerificationCode());
 
-      // Verify English (default) is applied with no stored preference
+      // Verify English preference is maintained
       await expect(newPage2).toHaveURL("/dashboard");
       await expect(newPage2.getByRole("heading", { level: 1 })).toBeVisible();
-      await expect(newPage2.evaluate(() => localStorage.getItem("preferred-locale"))).resolves.toBeNull();
+      await expect(newPage2.evaluate(() => localStorage.getItem("preferred-locale"))).resolves.toBe("en-US");
     })();
   });
 });
