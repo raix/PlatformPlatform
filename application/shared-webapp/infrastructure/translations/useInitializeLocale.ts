@@ -1,8 +1,9 @@
 import { useContext, useEffect } from "react";
 
+import type { Locale } from "./Translation";
+
 import { AuthenticationContext } from "../auth/AuthenticationProvider";
-import { preferredLocaleKey } from "./constants";
-import { type Locale, persistPreferredLocale } from "./Translation";
+import { persistPreferredLocale, preferredLocaleKey } from "./constants";
 import { translationContext } from "./TranslationContext";
 
 export function useInitializeLocale() {
@@ -11,7 +12,7 @@ export function useInitializeLocale() {
 
   useEffect(() => {
     if (userInfo?.isAuthenticated) {
-      persistPreferredLocale(document.documentElement.lang as Locale);
+      persistPreferredLocale(document.documentElement.lang);
     } else {
       const storedLocale = localStorage.getItem(preferredLocaleKey) as Locale;
       if (storedLocale) {

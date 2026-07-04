@@ -4,7 +4,7 @@ import { i18n, type Messages } from "@lingui/core";
 import { I18nProvider, useLingui } from "@lingui/react";
 import { type ComponentType, Suspense, useEffect, useMemo, useState } from "react";
 
-import { preferredLocaleKey } from "./constants";
+import { persistPreferredLocale, preferredLocaleKey } from "./constants";
 import localeMap from "./i18n.config";
 import { type TranslationContext as TranslationContextValue, translationContext } from "./TranslationContext";
 
@@ -138,11 +138,20 @@ function ensureSystemActive(systemId: string, loader: LocalLoaderFunction, local
 }
 
 /**
- * Resolve the initial locale. Authenticated users follow the server (`<html lang>`, set from the JWT);
- * anonymous users have their stored choice re-applied by `useInitializeLocale` after mount.
+ * Resolve the initial locale before the first render. Authenticated users follow the server-rendered
+ * `<html lang>` (set from their JWT/DB locale) -- it is authoritative. Anonymous users, whose stored
+ * preference the server cannot know, have that choice applied here so the first paint is already in the
+ * right locale rather than flashing the default until `useInitializeLocale` runs post-mount.
  */
 function resolveInitialLocale(): Locale {
   const serverLocale = document.documentElement.lang;
+  if (import.meta.user_info_env.isAuthenticated && isLocale(serverLocale)) {
+    return serverLocale;
+  }
+  const storedLocale = localStorage.getItem(preferredLocaleKey);
+  if (storedLocale && isLocale(storedLocale)) {
+    return storedLocale;
+  }
   if (isLocale(serverLocale)) {
     return serverLocale;
   }
@@ -150,19 +159,6 @@ function resolveInitialLocale(): Locale {
     return import.meta.env.LOCALE;
   }
   return locales[0];
-}
-
-/** The default locale (first in the config). Selecting it clears any stored preference, so an absent
- * `preferred-locale` entry always means "use the default" -- storage never holds a redundant default. */
-export const defaultLocale = locales[0];
-
-/** Persist the preferred-locale choice, clearing it when it matches the default so absence == default. */
-export function persistPreferredLocale(locale: Locale): void {
-  if (locale === defaultLocale) {
-    localStorage.removeItem(preferredLocaleKey);
-  } else {
-    localStorage.setItem(preferredLocaleKey, locale);
-  }
 }
 
 /** Change the active locale for every registered system and persist the choice. */
