@@ -36,11 +36,3 @@ declare module "account/TenantStateGuard" {
 declare module "account/UserMenu" {
   export default ReactNode;
 }
-declare module "account/translations/da-DK" {
-  import type { Messages } from "@lingui/core";
-  export const messages: Messages;
-}
-declare module "account/translations/en-US" {
-  import type { Messages } from "@lingui/core";
-  export const messages: Messages;
-}

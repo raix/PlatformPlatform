@@ -61,9 +61,7 @@ export default defineConfig({
         "./PublicNavigation": "./federated-modules/public/PublicNavigation.tsx",
         "./SuspendedPage": "./federated-modules/subscription/SuspendedPage.tsx",
         "./TenantStateGuard": "./federated-modules/subscription/TenantStateGuard.tsx",
-        "./UserMenu": "./federated-modules/userMenu/UserMenu.tsx",
-        "./translations/da-DK": "./shared/translations/locale/da-DK.ts",
-        "./translations/en-US": "./shared/translations/locale/en-US.ts"
+        "./UserMenu": "./federated-modules/userMenu/UserMenu.tsx"
       }
     })
   ]
