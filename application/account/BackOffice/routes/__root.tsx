@@ -3,10 +3,10 @@ import { AuthenticationProvider } from "@repo/infrastructure/auth/Authentication
 import { themeColor } from "@repo/infrastructure/branding";
 import { useErrorTrigger } from "@repo/infrastructure/development/useErrorTrigger";
 import { useInitializeLocale } from "@repo/infrastructure/translations/useInitializeLocale";
-import { BannerPortal } from "@repo/ui/components/BannerPortal";
+import { BannerContainer } from "@repo/ui/components/BannerContainer";
 import { ThemeModeProvider } from "@repo/ui/theme/mode/ThemeMode";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { createRootRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createRootRoute, Outlet } from "@tanstack/react-router";
 
 import { BackOfficeBanners } from "@/shared/components/BackOfficeBanners";
 import { ErrorPage } from "@/shared/components/errorPages/ErrorPage";
@@ -20,17 +20,16 @@ export const Route = createRootRoute({
 });
 
 function Root() {
-  const navigate = useNavigate();
   useInitializeLocale();
   useErrorTrigger();
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeModeProvider themeColor={themeColor}>
-        <AuthenticationProvider navigate={(options) => navigate(options)}>
-          <BannerPortal>
+        <AuthenticationProvider>
+          <BannerContainer>
             <BackOfficeBanners />
-          </BannerPortal>
+          </BannerContainer>
           <PageTracker />
           <Outlet />
         </AuthenticationProvider>

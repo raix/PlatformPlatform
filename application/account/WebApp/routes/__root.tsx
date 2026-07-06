@@ -1,22 +1,5 @@
-import { PageTracker } from "@repo/infrastructure/applicationInsights/PageTracker";
-import { OnboardingGuard } from "@repo/infrastructure/onboarding/OnboardingGuard";
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 
-import ErrorPage from "@/federated-modules/errorPages/ErrorPage";
-import NotFoundPage from "@/federated-modules/errorPages/NotFoundPage";
-
-export const Route = createRootRoute({
-  component: Root,
-  errorComponent: ErrorPage,
-  notFoundComponent: NotFoundPage
-});
-
-function Root() {
-  return (
-    <>
-      <PageTracker />
-      <Outlet />
-      <OnboardingGuard />
-    </>
-  );
-}
+// Code generation anchor only: account routes are re-parented into the host application's
+// router (see federated-modules/routes.tsx), so this root route never renders.
+export const Route = createRootRoute({ component: Outlet });

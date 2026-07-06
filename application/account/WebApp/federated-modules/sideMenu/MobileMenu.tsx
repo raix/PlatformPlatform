@@ -18,22 +18,20 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@repo/ui/components/Too
 import { LayoutDashboardIcon, MessageCircleQuestion } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 
+import { useMainNavigation } from "@/shared/hooks/useMainNavigation";
 import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
 
 import { fetchTenants, type TenantInfo } from "../common/tenantUtils";
 import { MobileMenuContent } from "./MobileMenuContent";
 import { MobileMenuDialogs } from "./MobileMenuDialogs";
 
-export interface MobileMenuProps {
-  onNavigate?: (path: string) => void;
-}
-
 // Rich mobile navigation surface rendered inside the Sidebar's mobile Sheet. Shows tenant info,
 // user actions, tenant switcher, navigation links, and a support button. Federated so both the
 // Main and Account apps can reuse it inside their mobile sidebars.
-function MobileMenu({ onNavigate }: Readonly<MobileMenuProps>) {
+function MobileMenu() {
   const userInfo = useUserInfo();
   const overlayCtx = useContext(overlayContext);
+  const { navigateToMain } = useMainNavigation();
   const [tenants, setTenants] = useState<TenantInfo[]>([]);
 
   useTrackOpen("Mobile menu", "menu");
@@ -94,20 +92,13 @@ function MobileMenu({ onNavigate }: Readonly<MobileMenuProps>) {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                {/* `onNavigate` is provided by the Account app (federated) and the Main app's Dashboard
-                    SCS-local navigator, avoiding full page reloads when both apps are loaded together.
-                    When absent, fall back to a hard navigation — correct for /dashboard since it may live
-                    in a different SCS than the current Account sidebar. Uses a plain <Button> rather than
-                    <SidebarMenuButton> because @repo/ui isn't shared across module federation, so the
-                    federated MobileMenu can't reach the host's SidebarProvider context. */}
+                {/* Uses a plain <Button> rather than <SidebarMenuButton> because @repo/ui isn't shared
+                    across module federation, so the federated MobileMenu can't reach the host's
+                    SidebarProvider context. */}
                 <Button
                   variant="ghost"
                   onClick={() => {
-                    if (onNavigate) {
-                      onNavigate("/dashboard");
-                    } else {
-                      window.location.href = "/dashboard";
-                    }
+                    navigateToMain("/dashboard");
                     closeMenu();
                   }}
                   className="flex h-[var(--control-height)] w-full items-center justify-start gap-4 rounded-md pr-3 pl-[1.125rem] text-left text-sm font-normal text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground"

@@ -86,6 +86,20 @@
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "error",
 
+    // The router owns browser history. Direct history mutation is a shadow routing pattern that
+    // desynchronizes the router from the address bar.
+    "no-restricted-properties": [
+      "error",
+      {
+        "property": "pushState",
+        "message": "Never manipulate window.history directly; the single router owns history. Navigate with useNavigate() or <Link>."
+      },
+      {
+        "property": "replaceState",
+        "message": "Never manipulate window.history directly; the single router owns history. Navigate with useNavigate() or <Link>."
+      }
+    ],
+
     // Restrict specific imports with custom messages
     "no-restricted-imports": [
       "error",
@@ -95,6 +109,16 @@
           {
             "name": "recharts",
             "message": "Import chart components from @repo/ui/components/Chart instead. The shared wrappers default accessibilityLayer={true} on chart types so Tab routes to data points and the focus ring matches our theme — importing recharts directly bypasses this and Chrome will paint its native blue focus ring on the SVG."
+          },
+          {
+            "name": "@tanstack/react-router",
+            "importNames": ["createRouter"],
+            "message": "Only shared/lib/router/router.tsx may create a router. Exactly one router owns history and rendering per page; federated modules contribute route subtrees to the host router and must never mount a router of their own."
+          },
+          {
+            "name": "react-dom",
+            "importNames": ["createPortal"],
+            "message": "Do not portal into shared DOM nodes. Render into a container owned by a single component (e.g. BannerContainer children) so every DOM region has exactly one writer."
           }
         ]
       }
@@ -170,6 +194,12 @@
     },
     {
       "files": ["**/shared-webapp/ui/components/Chart.tsx"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["**/main/WebApp/shared/lib/router/router.tsx", "**/BackOffice/shared/lib/router/router.tsx"],
       "rules": {
         "no-restricted-imports": "off"
       }

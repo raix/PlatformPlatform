@@ -6,9 +6,9 @@ import { step } from "@shared/e2e/utils/test-step-wrapper";
 
 test.describe("@smoke", () => {
   /**
-   * FEDERATED ACCOUNTAPP ARCHITECTURE TESTS
+   * FEDERATED ROUTE CONTRIBUTION ARCHITECTURE TESTS
    *
-   * Tests the federated AccountApp module integration verifying:
+   * Tests the account route subtree contributed to the host router verifying:
    * - Login/signup flows render correctly via module federation
    * - Cross-SCS navigation works (main SCS -> account SCS -> main SCS)
    * - Account area routes render correctly for authenticated users

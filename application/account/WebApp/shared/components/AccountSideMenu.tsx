@@ -29,7 +29,6 @@ import { use } from "react";
 
 import MobileMenu from "@/federated-modules/sideMenu/MobileMenu";
 import UserMenu from "@/federated-modules/userMenu/UserMenu";
-import { useMainNavigation } from "@/shared/hooks/useMainNavigation";
 
 const normalizePath = (path: string): string => path.replace(/\/$/, "") || "/";
 
@@ -43,7 +42,6 @@ export function AccountSideMenu() {
   const userInfo = useUserInfo();
   const router = useRouter();
   const currentPath = normalizePath(router.state.location.pathname);
-  const { navigateToMain } = useMainNavigation();
   const { enabled: isSubscriptionEnabled } = useFeatureFlag("subscriptions");
   const { enabled: isAccountOverviewEnabled } = useFeatureFlag("account-overview");
 
@@ -55,7 +53,7 @@ export function AccountSideMenu() {
   const showBilling = userInfo?.role === "Owner" && isSubscriptionEnabled;
 
   return (
-    <Sidebar collapsible="icon" mobileContent={<MobileMenu onNavigate={navigateToMain ?? undefined} />}>
+    <Sidebar collapsible="icon" mobileContent={<MobileMenu />}>
       <nav className="contents" aria-label={t`Main navigation`}>
         <SidebarHeader>
           <HeaderUserMenu />

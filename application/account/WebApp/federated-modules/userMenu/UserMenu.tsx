@@ -11,11 +11,11 @@ import { collapsedContext, overlayContext } from "@repo/ui/components/Sidebar";
 import { TenantLogo } from "@repo/ui/components/TenantLogo";
 import { getRootFontSize, SIDE_MENU_DEFAULT_WIDTH_REM } from "@repo/ui/utils/responsive";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronsUpDownIcon } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 
-import { MainNavigationContext } from "@/shared/hooks/useMainNavigation";
+import { useMainNavigation } from "@/shared/hooks/useMainNavigation";
 import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
 
 import { SupportDialog } from "../common/SupportDialog";
@@ -35,7 +35,7 @@ function UserMenu({ isCollapsed: isCollapsedProp }: Readonly<UserMenuProps>) {
   const isCollapsedContext = useContext(collapsedContext);
   const isCollapsed = isCollapsedProp ?? isCollapsedContext;
   const overlayCtx = useContext(overlayContext);
-  const navigateToMain = useContext(MainNavigationContext);
+  const { navigateToMain } = useMainNavigation();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -43,6 +43,11 @@ function UserMenu({ isCollapsed: isCollapsedProp }: Readonly<UserMenuProps>) {
 
   const sidebarWidth = useSidebarWidth(isCollapsed);
   const canAccessAccountSettings = hasPermission({ allowedRoles: ["Owner", "Admin"] });
+
+  // Inside account pages the menu offers "Back to app"; on main's own pages it does not.
+  const isAccountContext = useRouterState({
+    select: (state) => state.matches.some((match) => String(match.routeId).startsWith("/account-layout"))
+  });
 
   useTrackOpen("User menu", "menu", isMenuOpen);
 
@@ -60,7 +65,6 @@ function UserMenu({ isCollapsed: isCollapsedProp }: Readonly<UserMenuProps>) {
   const currentTenantName = currentTenant?.tenantName || userInfo.tenantName || productName;
   const currentTenantNameForLogo = currentTenant?.tenantName || userInfo.tenantName || "";
   const currentTenantLogoUrl = currentTenant ? currentTenant.logoUrl : userInfo.tenantLogoUrl;
-  const isAccountContext = navigateToMain !== null;
 
   const closeMenuAndOverlay = () => {
     setIsMenuOpen(false);
@@ -71,9 +75,7 @@ function UserMenu({ isCollapsed: isCollapsedProp }: Readonly<UserMenuProps>) {
 
   const handleNavigateBackToApp = () => {
     closeMenuAndOverlay();
-    if (navigateToMain) {
-      navigateToMain("/dashboard");
-    }
+    navigateToMain("/dashboard");
   };
 
   const handleShowSupport = () => {

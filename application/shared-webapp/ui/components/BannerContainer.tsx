@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useRef } from "react";
 
-type BannerPortalProps = {
+type BannerContainerProps = {
   children: React.ReactNode;
 };
 
@@ -29,22 +29,24 @@ function useBannerOffset(bannerRef: React.RefObject<HTMLDivElement | null>) {
 }
 
 /**
- * Portal target for banners.
- * Place this at the top of your app's root component.
- * Banners will portal their content into this element.
+ * The single owner of the fixed banner area at the top of the viewport.
+ * Place this at the top of your app's root component and pass banners as children.
+ *
+ * Banners render as ordinary React children inside the container element, so the
+ * element has exactly one writer and duplicate banners are structurally impossible.
+ * Never render banner content into this element from anywhere else.
  *
  * The element is fixed at the top of the viewport.
  * z-40 ensures banners stay above mobile sticky header (z-30) during animations.
  * Measures the banner height and sets --banner-offset CSS variable for content positioning.
  */
-export function BannerPortal({ children }: BannerPortalProps) {
+export function BannerContainer({ children }: BannerContainerProps) {
   const bannerRef = useRef<HTMLDivElement>(null);
   useBannerOffset(bannerRef);
 
   return (
-    <>
-      <div ref={bannerRef} id="banner-root" className="fixed top-0 right-0 left-0 z-40 [&_button]:w-fit" />
+    <div ref={bannerRef} className="fixed top-0 right-0 left-0 z-40 [&_button]:w-fit">
       <Suspense>{children}</Suspense>
-    </>
+    </div>
   );
 }
