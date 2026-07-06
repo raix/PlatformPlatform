@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "exports": {
     ".": "./dist/index.js",
     "./*": "./dist/*.js",
@@ -12,10 +16,10 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "rimraf ./dist && tsc -b . environment",
+    "build": "rslib build && tsc --noEmit -p environment/tsconfig.json",
     "check": "oxfmt --check && oxlint",
-    "dev": "tsc -b . environment -w",
-    "dev:setup": "tsc -b . environment",
+    "dev": "rslib build --watch --no-clean",
+    "dev:setup": "rslib build",
     "format": "oxfmt && (oxlint --fix || true)",
     "lint": "oxlint --deny-warnings"
   },

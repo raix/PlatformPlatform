@@ -7,7 +7,6 @@ import { RunTimeEnvironmentPlugin } from "@repo/build/plugin/RunTimeEnvironmentP
 import { TailwindPlugin } from "@repo/build/plugin/TailwindPlugin";
 import { defineConfig } from "@rsbuild/core";
 import { pluginReact } from "@rsbuild/plugin-react";
-import { pluginSourceBuild } from "@rsbuild/plugin-source-build";
 import { pluginSvgr } from "@rsbuild/plugin-svgr";
 import { pluginTypeCheck } from "@rsbuild/plugin-type-check";
 
@@ -45,13 +44,10 @@ export default defineConfig({
     pluginReact(),
     pluginTypeCheck(),
     pluginSvgr(),
-    pluginSourceBuild({
-      sourceField: "source"
-    }),
     FileSystemRouterPlugin(),
     RunTimeEnvironmentPlugin(customBuildEnv, { federationOnly: true }),
     LinguiPlugin(),
-    DevelopmentServerPlugin({ port: accountStaticPort, liveReload: false }),
+    DevelopmentServerPlugin({ port: accountStaticPort, liveReload: false, hmrPath: "/account/rsbuild-hmr" }),
     ModuleFederationPlugin({
       exposes: {
         "./AccessDeniedPage": "./federated-modules/errorPages/AccessDeniedPage.tsx",
@@ -65,9 +61,7 @@ export default defineConfig({
         "./PublicNavigation": "./federated-modules/public/PublicNavigation.tsx",
         "./SuspendedPage": "./federated-modules/subscription/SuspendedPage.tsx",
         "./TenantStateGuard": "./federated-modules/subscription/TenantStateGuard.tsx",
-        "./UserMenu": "./federated-modules/userMenu/UserMenu.tsx",
-        "./translations/da-DK": "./shared/translations/locale/da-DK.ts",
-        "./translations/en-US": "./shared/translations/locale/en-US.ts"
+        "./UserMenu": "./federated-modules/userMenu/UserMenu.tsx"
       }
     })
   ]

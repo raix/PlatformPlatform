@@ -38,6 +38,12 @@ export type DevelopmentServerPluginOptions = {
    * update from reloading the host page while the remote is still rebuilding.
    */
   liveReload?: boolean;
+  /**
+   * The HMR WebSocket path. Defaults to rsbuild's `/rsbuild-hmr`. Systems that share an origin with the
+   * host (e.g. the `account` remote loaded into `main` under `app.dev.localhost`) must use a distinct
+   * path so the gateway can route each system's WebSocket to its own dev server.
+   */
+  hmrPath?: string;
 };
 
 /**
@@ -101,9 +107,13 @@ export function DevelopmentServerPlugin(options: DevelopmentServerPluginOptions)
             }
           },
           dev: {
-            client: {
-              port: options.port
-            },
+            // Leave client host/port unset so the HMR WebSocket targets the page's own origin -- the
+            // AppGateway (app.dev.localhost:<gatewayPort> for main/account) or the BackOffice Kestrel --
+            // which forwards the upgrade to this dev server, matching how every other dev asset is served.
+            // rsbuild's client then uses location.host/port instead of pinning the dev server's own port,
+            // which would bypass the gateway. Co-hosted systems (main + the account remote) share one
+            // origin, so each passes a distinct hmrPath for the gateway to route each WebSocket on.
+            client: options.hmrPath ? { path: options.hmrPath } : {},
             liveReload: options.liveReload ?? true,
             // Set publicPath to auto to enable the server to serve the files
             assetPrefix: "auto",

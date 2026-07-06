@@ -17,7 +17,7 @@ export function EmailsPreview() {
   // The iframe locale follows the SPA's active locale (set by the avatar-menu locale switcher) so
   // designers don't have to toggle locales twice. Falls back to en-US if the user's chosen locale
   // doesn't have a rendered email artifact yet — the email build only emits the locales listed in
-  // application/shared-webapp/infrastructure/translations/i18n.config.json that have .po catalogs.
+  // application/shared-webapp/infrastructure/translations/i18n.config.ts that have .po catalogs.
   const locale: PreviewLocale = (SUPPORTED_PREVIEW_LOCALES as readonly string[]).includes(i18n.locale)
     ? (i18n.locale as PreviewLocale)
     : FALLBACK_PREVIEW_LOCALE;

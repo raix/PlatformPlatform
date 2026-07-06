@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react";
 import { trackInteraction } from "@repo/infrastructure/applicationInsights/ApplicationInsightsProvider";
-import { preferredLocaleKey } from "@repo/infrastructure/translations/constants";
-import localeMap from "@repo/infrastructure/translations/i18n.config.json";
+import localeMap from "@repo/infrastructure/translations/i18n.config";
 import { type Locale, translationContext } from "@repo/infrastructure/translations/TranslationContext";
 import { MoonStarIcon, SunMoonIcon } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -34,7 +34,9 @@ export const ThemeMode = {
 
 export function usePreferences() {
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const [currentLocale, setCurrentLocale] = useState<Locale>("en-US");
+  // Active locale comes from the shared i18n singleton so the radio stays correct regardless of how the
+  // locale changed (this screen, the language switcher, an auth refresh); no local mirror to keep in sync.
+  const currentLocale = useLingui().i18n.locale as Locale;
   const [currentZoomLevel, setCurrentZoomLevel] = useState(defaultZoomValue);
   const { setLocale } = use(translationContext);
 
@@ -54,15 +56,6 @@ export function usePreferences() {
   });
 
   useEffect(() => {
-    const htmlLang = document.documentElement.lang as Locale;
-    const savedLocale = localStorage.getItem(preferredLocaleKey) as Locale;
-
-    if (savedLocale && locales.some((l) => l.id === savedLocale)) {
-      setCurrentLocale(savedLocale);
-    } else if (htmlLang && locales.some((l) => l.id === htmlLang)) {
-      setCurrentLocale(htmlLang);
-    }
-
     const savedZoomLevel = localStorage.getItem(zoomLevelStorageKey);
     if (savedZoomLevel && validZoomValues.includes(savedZoomLevel)) {
       setCurrentZoomLevel(savedZoomLevel);
@@ -76,14 +69,11 @@ export function usePreferences() {
 
     const localeLabel = locales.find((l) => l.id === locale)?.label ?? locale;
     trackInteraction("User preferences", "interaction", `Change language to "${localeLabel}"`);
-    localStorage.setItem(preferredLocaleKey, locale);
     changeLocaleMutation.mutate(
       { body: { locale } },
       {
         onSuccess: async () => {
-          document.documentElement.lang = locale;
           await setLocale(locale);
-          setCurrentLocale(locale);
         }
       }
     );

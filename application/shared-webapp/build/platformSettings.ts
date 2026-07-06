@@ -68,7 +68,7 @@ export interface PlatformSettings {
 // platform-settings.jsonc is the single source of truth for brand configuration, shared by the
 // backend (embedded resource) and the frontend (injected here at build time). It lives at the
 // application root; this file compiles to shared-webapp/build/dist/, three levels below it.
-const settingsPath = path.join(__dirname, "..", "..", "..", "platform-settings.jsonc");
+const settingsPath = path.join(import.meta.dirname, "..", "..", "..", "platform-settings.jsonc");
 
 export function loadPlatformSettings(): PlatformSettings {
   const raw = fs.readFileSync(settingsPath, "utf8");

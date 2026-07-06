@@ -5,6 +5,8 @@ import { shouldBlockNavigation } from "@repo/ui/hooks/federatedNavigationGuard";
 import { createRouter, type NavigateOptions, RouterProvider } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
+
 import { UnsavedChangesDialog } from "../shared/components/UnsavedChangesDialog";
 import { MainNavigationContext } from "../shared/hooks/useMainNavigation";
 import { routeTree } from "../shared/lib/router/routeTree.generated";
@@ -14,7 +16,7 @@ export interface AccountAppProps {
   onNavigateToMain: (path: string) => void;
 }
 
-export default function AccountApp({ initialPath, onNavigateToMain }: Readonly<AccountAppProps>) {
+function AccountApp({ initialPath, onNavigateToMain }: Readonly<AccountAppProps>) {
   // Store initialPath in a ref to prevent router recreation when main's router re-renders
   // due to URL changes from window.history.pushState() calls within this component
   const initialPathRef = useRef(initialPath);
@@ -88,3 +90,5 @@ export default function AccountApp({ initialPath, onNavigateToMain }: Readonly<A
     </div>
   );
 }
+
+export default withAccountTranslations(AccountApp);

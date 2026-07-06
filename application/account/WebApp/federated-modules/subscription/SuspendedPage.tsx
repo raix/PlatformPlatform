@@ -10,6 +10,8 @@ import { Logo } from "@repo/ui/components/Logo";
 import { AlertTriangleIcon, LogOut } from "lucide-react";
 import { useContext, useState } from "react";
 
+import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
+
 import LocaleSwitcher from "../common/LocaleSwitcher";
 import SupportButton from "../common/SupportButton";
 import ThemeModeSelector from "../common/ThemeModeSelector";
@@ -75,7 +77,7 @@ function SuspendedNavigation() {
   );
 }
 
-export default function SuspendedPage() {
+function SuspendedPage() {
   const userInfo = useUserInfo();
   const isOwner = userInfo?.role === "Owner";
 
@@ -121,3 +123,5 @@ export default function SuspendedPage() {
     </main>
   );
 }
+
+export default withAccountTranslations(SuspendedPage);

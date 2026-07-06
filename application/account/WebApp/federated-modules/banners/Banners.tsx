@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
+import { withAccountTranslations } from "@/shared/translations/withAccountTranslations";
+
 import ExpiringCardBanner from "./ExpiringCardBanner";
 import InvitationBanner from "./InvitationBanner";
 import PaymentFailedBanner from "./PaymentFailedBanner";
 import "@repo/ui/tailwind.css";
 
-export default function Banners() {
+function Banners() {
   const [target] = useState(() => document.getElementById("banner-root"));
 
   if (!target) {
@@ -22,3 +24,5 @@ export default function Banners() {
     target
   );
 }
+
+export default withAccountTranslations(Banners);

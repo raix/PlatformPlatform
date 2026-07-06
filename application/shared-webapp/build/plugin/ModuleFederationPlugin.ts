@@ -14,7 +14,7 @@ if (!fs.existsSync(applicationPackageJson)) {
   throw new Error(`Cannot find package.json in the application root: ${applicationRoot}`);
 }
 
-const { dependencies } = require(applicationPackageJson);
+const { dependencies } = JSON.parse(fs.readFileSync(applicationPackageJson, "utf-8"));
 
 const SYSTEM_ID = getSystemId();
 
@@ -48,6 +48,17 @@ export function ModuleFederationPlugin({
                 "react-dom": {
                   singleton: true,
                   requiredVersion: dependencies["react-dom"]
+                },
+                // Lingui's `i18n` is a module-level singleton exported from @lingui/core. It must be a
+                // single instance across every remote so the merged catalog activated by one system is
+                // the same object every other system's `<Trans>`/`useLingui` reads from.
+                "@lingui/core": {
+                  singleton: true,
+                  requiredVersion: dependencies["@lingui/core"]
+                },
+                "@lingui/react": {
+                  singleton: true,
+                  requiredVersion: dependencies["@lingui/react"]
                 }
               }
             }
@@ -113,14 +124,7 @@ function generateModuleFederationTypesFolder(system: string, exposes: Record<str
     .map(([exportPath, importPath]) => {
       logger.info(`[Module Federation] Expose: ${exportPath} => ${importPath}`);
 
-      // Pattern matching for different module types
-      // Translation files follow the pattern: ./translations/xx-XX (e.g., ./translations/en-US)
-      const translationPattern = /^\.\/translations\/[a-z]{2}-[A-Z]{2}$/;
-      if (translationPattern.test(exportPath)) {
-        return `declare module "${exportPath.replace(/^\./, system)}" {\n  import type { Messages } from "@lingui/core";\n  export const messages: Messages;\n}`;
-      }
-
-      // Default to ReactNode export for components
+      // Every exposed federated module is a React component.
       return `declare module "${exportPath.replace(/^\./, system)}" {\n  export default ReactNode;\n}`;
     })
     .join("\n");
