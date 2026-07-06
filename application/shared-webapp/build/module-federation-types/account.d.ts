@@ -3,9 +3,6 @@
 declare module "account/AccessDeniedPage" {
   export default ReactNode;
 }
-declare module "account/AccountApp" {
-  export default ReactNode;
-}
 declare module "account/AuthSyncModal" {
   export default ReactNode;
 }
@@ -26,6 +23,9 @@ declare module "account/PublicFooter" {
 }
 declare module "account/PublicNavigation" {
   export default ReactNode;
+}
+declare module "account/routes" {
+  export default function createRouteTree(getParentRoute: () => unknown): unknown;
 }
 declare module "account/SuspendedPage" {
   export default ReactNode;

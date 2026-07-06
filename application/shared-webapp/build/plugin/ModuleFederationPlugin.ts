@@ -59,6 +59,18 @@ export function ModuleFederationPlugin({
                 "@lingui/react": {
                   singleton: true,
                   requiredVersion: dependencies["@lingui/react"]
+                },
+                // Router instances, route objects, and router context cross the federation boundary,
+                // so every remote must bind the exact same router module instance.
+                "@tanstack/react-router": {
+                  singleton: true,
+                  requiredVersion: dependencies["@tanstack/react-router"]
+                },
+                // Federated components resolve their QueryClient from the host's provider; the context
+                // object doing that lookup must come from a single module instance.
+                "@tanstack/react-query": {
+                  singleton: true,
+                  requiredVersion: dependencies["@tanstack/react-query"]
                 }
               }
             }
@@ -124,8 +136,15 @@ function generateModuleFederationTypesFolder(system: string, exposes: Record<str
     .map(([exportPath, importPath]) => {
       logger.info(`[Module Federation] Expose: ${exportPath} => ${importPath}`);
 
-      // Every exposed federated module is a React component.
-      return `declare module "${exportPath.replace(/^\./, system)}" {\n  export default ReactNode;\n}`;
+      const moduleName = exportPath.replace(/^\./, system);
+
+      // The routes expose is a route-tree factory contributing routes to the host router.
+      if (exportPath === "./routes") {
+        return `declare module "${moduleName}" {\n  export default function createRouteTree(getParentRoute: () => unknown): unknown;\n}`;
+      }
+
+      // Every other exposed federated module is a React component.
+      return `declare module "${moduleName}" {\n  export default ReactNode;\n}`;
     })
     .join("\n");
 

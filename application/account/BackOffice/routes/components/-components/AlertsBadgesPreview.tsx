@@ -6,7 +6,6 @@ import { Button } from "@repo/ui/components/Button";
 import { Separator } from "@repo/ui/components/Separator";
 import { AlertCircleIcon, FlagIcon, InfoIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { useState } from "react";
-import { createPortal } from "react-dom";
 
 import { ItemPreview } from "./ItemPreview";
 import { ProgressPreview } from "./ProgressPreview";
@@ -29,14 +28,13 @@ const bannerContent: Record<BannerVariant, { message: () => string; icon: React.
   }
 };
 
+// Renders inline in the preview. The live banner area is owned exclusively by BannerContainer,
+// so preview content must never render into it.
 function SampleBanner({ variant, onClose }: Readonly<{ variant: BannerVariant; onClose: () => void }>) {
-  const [target] = useState(() => document.getElementById("banner-root"));
-  if (!target) return null;
-
   const content = bannerContent[variant];
 
-  return createPortal(
-    <div className="flex h-12 items-center gap-3 border-b border-warning/50 bg-warning px-4 text-sm">
+  return (
+    <div className="flex h-12 items-center gap-3 rounded-md border border-warning/50 bg-warning px-4 text-sm">
       {content.icon}
       <span className="flex-1 text-warning-foreground">{content.message()}</span>
       {variant === "cta" && (
@@ -49,8 +47,7 @@ function SampleBanner({ variant, onClose }: Readonly<{ variant: BannerVariant; o
           <XIcon className="size-4" />
         </Button>
       )}
-    </div>,
-    target
+    </div>
   );
 }
 

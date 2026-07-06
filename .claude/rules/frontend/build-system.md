@@ -38,9 +38,13 @@ federation remotes. Understand these constraints before changing any `rslib.conf
    hand-rolled copy step). Node-side build code must be ESM-safe (`import.meta.dirname`,
    not `__dirname`; read JSON with `fs`, not `require()`).
 
-4. **Keep `react`, `react-dom`, `@lingui/core`, `@lingui/react` as module-federation `shared` singletons**
+4. **Keep `react`, `react-dom`, `@lingui/core`, `@lingui/react`, `@tanstack/react-router`, and
+   `@tanstack/react-query` as module-federation `shared` singletons**
    (`application/shared-webapp/build/plugin/ModuleFederationPlugin.ts`). The translation system depends on a
    single shared Lingui `i18n` across remotes — see [translations](/.claude/rules/frontend/translations.md).
+   Router instances and route objects cross the federation boundary (account contributes its route subtree
+   to Main's single router), and federated components resolve their QueryClient from the host's provider,
+   so those modules must also bind to one instance.
 
 5. **TypeScript 7 is intentionally deferred — stay on the 6.x line.** TS 7's native compiler removed the
    classic programmatic API (its `package.json` exposes no main export, only `./unstable/*`), so

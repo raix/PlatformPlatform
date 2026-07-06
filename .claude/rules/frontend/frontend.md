@@ -26,14 +26,18 @@ Use browser MCP tools to test at `https://app.dev.localhost:<appGateway>`. Look 
 2. **Module Federation for Micro-Frontends**:
    - Each self-contained system has its own WebApp
    - Common UI exposed via federation in `federated-modules/`
+   - **Federated leaf exposes stay presentation-shaped**: they may navigate through the shared router hooks, but they never own routes, history, or shared DOM regions. The only structural expose is `./routes` (the route subtree contribution)
    - Shared components in `application/shared-webapp/`
    - Don't import directly between self-contained systems
 
 3. **Navigation**:
+   - **One router per page**: The Main host runs the only TanStack Router. Federated systems contribute route subtrees to it (account exposes `./routes`; Main grafts it in `shared/lib/router/router.tsx`). Never create a second router in a federated module - lint blocks `createRouter` outside `shared/lib/router/router.tsx`
+   - **The router owns browser history**: never call `window.history.pushState`/`replaceState` - lint blocks both. Hand-rolled history sync is a shadow routing pattern that desynchronizes the router from the address bar
    - **Within a self-contained system**: Use `useNavigate()` hook or `<Link>` component from TanStack Router
-   - **Account to Main**: Account runs as a federated module inside Main with a memory router. Use the `useMainNavigation()` hook (backed by `MainNavigationContext`) to navigate back to Main, not `window.location.href`
+   - **Account to Main**: Use the `useMainNavigation()` hook. Main paths such as `/dashboard` are ordinary navigations on the shared router; they are just not part of account's typed route tree
    - **To Back-Office**: Back-Office is a separate SPA, so use `window.location.href` for full-page navigation
    - Only use `window.location.href` when navigating to a different SPA or for full-page reloads (e.g., logout)
+   - **Route protection**: use `beforeLoad` only with the `routeGuards` helpers (`requireAuthentication`, `requirePermission`, `requireSubscriptionEnabled`) or tiny context flags like `disableAuthSync`. Prefer declarative guards that render `<Navigate>` (e.g. `OnboardingGuard`) for user-state redirects. Never load data in `beforeLoad` or route loaders - server state lives in TanStack Query only
 
 4. **API Integration**:
    - API client auto-generated from OpenAPI spec

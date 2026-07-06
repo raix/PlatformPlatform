@@ -1,4 +1,3 @@
-import type { NavigateOptions } from "@tanstack/react-router";
 import type React from "react";
 
 import { createContext, useCallback, useEffect, useMemo, useState } from "react";
@@ -24,7 +23,6 @@ export const AuthenticationContext = createContext<AuthenticationContextType>({
 
 export interface AuthenticationProviderProps {
   children: React.ReactNode;
-  navigate: (navigateOptions: NavigateOptions) => void;
 }
 
 export function AuthenticationProvider({ children }: Readonly<AuthenticationProviderProps>) {

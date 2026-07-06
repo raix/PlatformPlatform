@@ -6,11 +6,11 @@ import { useErrorTrigger } from "@repo/infrastructure/development/useErrorTrigge
 import { OnboardingGuard } from "@repo/infrastructure/onboarding/OnboardingGuard";
 import { useInitializeLocale } from "@repo/infrastructure/translations/useInitializeLocale";
 import { AddToHomescreen } from "@repo/ui/components/AddToHomescreen";
-import { BannerPortal } from "@repo/ui/components/BannerPortal";
+import { BannerContainer } from "@repo/ui/components/BannerContainer";
 import { ThemeModeProvider } from "@repo/ui/theme/mode/ThemeMode";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { createRootRoute, Outlet, useNavigate } from "@tanstack/react-router";
-import { lazy, useEffect } from "react";
+import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { lazy } from "react";
 
 import { queryClient } from "@/shared/lib/api/client";
 
@@ -26,21 +26,16 @@ export const Route = createRootRoute({
 });
 
 function Root() {
-  const navigate = useNavigate();
   useInitializeLocale();
   useErrorTrigger();
-
-  useEffect(() => {
-    import("account/AccountApp");
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeModeProvider themeColor={themeColor}>
-        <AuthenticationProvider navigate={(options) => navigate(options)}>
-          <BannerPortal>
+        <AuthenticationProvider>
+          <BannerContainer>
             <FederatedBanners />
-          </BannerPortal>
+          </BannerContainer>
           {showAddToHomescreen && <AddToHomescreen productName={productName} />}
           <PageTracker />
           <Outlet />

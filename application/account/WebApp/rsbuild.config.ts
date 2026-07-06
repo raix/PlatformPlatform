@@ -51,7 +51,6 @@ export default defineConfig({
     ModuleFederationPlugin({
       exposes: {
         "./AccessDeniedPage": "./federated-modules/errorPages/AccessDeniedPage.tsx",
-        "./AccountApp": "./federated-modules/AccountApp.tsx",
         "./AuthSyncModal": "./federated-modules/common/AuthSyncModal.tsx",
         "./Banners": "./federated-modules/banners/Banners.tsx",
         "./ErrorPage": "./federated-modules/errorPages/ErrorPage.tsx",
@@ -59,6 +58,7 @@ export default defineConfig({
         "./NotFoundPage": "./federated-modules/errorPages/NotFoundPage.tsx",
         "./PublicFooter": "./federated-modules/public/PublicFooter.tsx",
         "./PublicNavigation": "./federated-modules/public/PublicNavigation.tsx",
+        "./routes": "./federated-modules/routes.tsx",
         "./SuspendedPage": "./federated-modules/subscription/SuspendedPage.tsx",
         "./TenantStateGuard": "./federated-modules/subscription/TenantStateGuard.tsx",
         "./UserMenu": "./federated-modules/userMenu/UserMenu.tsx"

@@ -383,7 +383,7 @@ function Sidebar({
         className={cn(
           // Start below any banner strip (push-down behavior) and shrink the height to match so the
           // sidebar never extends past the viewport bottom. `--banner-offset` falls back to 0 when no
-          // banner is mounted (see `BannerPortal`).
+          // banner is mounted (see `BannerContainer`).
           "fixed top-(--banner-offset,0rem) bottom-0 z-40 hidden h-[calc(100svh-var(--banner-offset,0rem))] w-(--sidebar-width) transition-[left,right,width] duration-100 ease-linear sm:flex",
           "group-data-[resizing=true]/sidebar-wrapper:transition-none",
           side === "left"
