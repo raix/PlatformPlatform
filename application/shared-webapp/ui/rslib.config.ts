@@ -13,6 +13,11 @@ export default defineConfig({
         "./**/*.css",
         "./**/*.png",
         "./**/*.webp",
+        // The root Tailwind entry stylesheets are consumed directly via the package root exports
+        // (`./theme.css`, `./tailwind.css`), not from `dist`; keep them out of the entry so rslib does
+        // not emit dead, shadowed copies into `dist`.
+        "!theme.css",
+        "!tailwind.css",
         "!rslib.config.ts",
         "!node_modules/**",
         "!dist/**"

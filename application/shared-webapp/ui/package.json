@@ -14,8 +14,7 @@
     "./*.png": "./dist/*.png",
     "./*": {
       "types": "./dist/*.d.ts",
-      "import": "./dist/*.js",
-      "require": "./dist/*.js"
+      "import": "./dist/*.js"
     },
     "./theme.css": "./theme.css",
     "./tailwind.css": "./tailwind.css",

@@ -5,7 +5,7 @@ import { defineConfig } from "@rslib/core";
 export default defineConfig({
   source: {
     entry: {
-      index: ["./**/*.tsx", "./**/*.ts", "./**/*.json", "!rslib.config.ts", "!node_modules/**", "!dist/**"]
+      index: ["./**/*.tsx", "./**/*.ts", "!rslib.config.ts", "!node_modules/**", "!dist/**"]
     }
   },
   lib: [
